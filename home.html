@@ -1,55 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Filament Tracker</title>
-<link rel="stylesheet" href="style.css">
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#007acc">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Filament Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#007acc">
 </head>
 <body>
+  <header>
+    <h1>Filament Tracker</h1>
+  </header>
 
-<header>Filament Tracker</header>
+  <main id="home">
+    <button onclick="showScreen('addSpool')">➕ Add New Spool</button>
+    <button onclick="showScreen('library')">📦 View Inventory</button>
+    <button onclick="showScreen('history')">📜 Usage History</button>
+  </main>
 
-<!-- Home Screen -->
-<div id="home" class="screen active">
-  <button onclick="showScreen('addSpool')">➕ Add New Spool</button>
-  <button onclick="showScreen('history')">📜 Usage History</button>
-  <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
-</div>
+  <!-- Add Spool Screen -->
+  <section id="addSpool" class="hidden">
+    <h2>Add New Spool</h2>
+    <input id="brand" placeholder="Brand">
+    <input id="color" placeholder="Color">
+    <input id="material" placeholder="Material">
+    <input id="length" type="number" placeholder="Length (m)">
+    <input id="weight" type="number" placeholder="Weight (g)">
+    <button onclick="saveSpool()">Save Spool</button>
+    <button onclick="showScreen('home')">⬅ Back</button>
+  </section>
 
-<!-- Add Spool Screen -->
-<div id="addSpool" class="screen">
-  <h2>Add New Spool</h2>
-  <input type="text" id="spoolName" placeholder="Spool Name">
-  <input type="number" id="spoolWeight" placeholder="Weight (grams)">
-  <select id="spoolMaterial">
-    <option value="">Material Type</option>
-    <option value="PLA">PLA</option>
-    <option value="PETG">PETG</option>
-    <option value="ABS">ABS</option>
-    <option value="Other">Other</option>
-  </select>
-  <input type="color" id="spoolColor" value="#000000">
-  <button onclick="saveSpool()">💾 Save Spool</button>
-  <button class="back-btn" onclick="showScreen('home')">⬅ Back</button>
-</div>
+  <!-- Inventory Screen -->
+  <section id="library" class="hidden">
+    <h2>Spool Library</h2>
+    <ul id="spoolList"></ul>
+    <button onclick="showScreen('home')">⬅ Back</button>
+  </section>
 
-<!-- History Screen -->
-<div id="history" class="screen">
-  <h2>Usage History</h2>
-  <div id="historyList"></div>
-  <button class="back-btn" onclick="showScreen('home')">⬅ Back</button>
-</div>
+  <!-- Usage History Screen -->
+  <section id="history" class="hidden">
+    <h2>Usage History</h2>
+    <ul id="historyList"></ul>
+    <button onclick="showScreen('home')">⬅ Back</button>
+  </section>
 
-<!-- Tracking Screen -->
-<div id="tracking" class="screen">
-  <h2>Start Tracking</h2>
-  <p>(Tracking will go here when hardware is ready)</p>
-  <button class="back-btn" onclick="showScreen('home')">⬅ Back</button>
-</div>
-
-<script src="home.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
