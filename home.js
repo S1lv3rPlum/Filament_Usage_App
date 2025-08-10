@@ -386,3 +386,36 @@ function renderAnalytics() {
     }
   });
 }
+
+
+function saveUsage() {
+  const select = document.getElementById("selectSpool");
+  const selectedIndex = select.value;
+
+  if (selectedIndex === "") {
+    alert("Please select a spool.");
+    return;
+  }
+
+  const spool = spoolLibrary[selectedIndex];
+  const lengthUsed = parseFloat(document.getElementById("inputLengthUsed").value);
+
+  if (isNaN(lengthUsed) || lengthUsed <= 0) {
+    alert("Please enter a valid length used.");
+    return;
+  }
+
+  // Your existing logic to save usage here, for example:
+  usageHistory.push({
+    spoolIndex: selectedIndex,
+    spoolBrand: spool.brand,
+    spoolMaterial: spool.material,
+    spoolColor: spool.color,
+    lengthUsed: lengthUsed,
+    date: new Date().toISOString(),
+  });
+  localStorage.setItem("usageHistory", JSON.stringify(usageHistory));
+
+  alert("Usage saved!");
+  showScreen("home");
+}
