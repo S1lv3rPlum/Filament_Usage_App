@@ -263,3 +263,101 @@ document.getElementById("checkUpdatesBtn").addEventListener("click", () => {
     });
   }
 });
+
+// Load materials from localStorage or use default list
+let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
+  "PLA",
+  "ABS",
+  "PETG",
+  "Nylon",
+  "TPU",
+  "Custom"
+];
+
+// Populate the material dropdown options
+function populateMaterialDropdown() {
+  const select = document.getElementById("materialSelect");
+  select.innerHTML = ""; // Clear current options
+
+  materialsList.forEach(material => {
+    const option = document.createElement("option");
+    option.value = material;
+    option.textContent = material;
+    select.appendChild(option);
+  });
+
+  // Default to first material
+  select.value = materialsList[0];
+  document.getElementById("customMaterialInput").classList.add("hidden");
+  document.getElementById("customMaterialInput").value = "";
+}
+
+// Show/hide custom input based on selection
+function handleMaterialChange() {
+  const select = document.getElementById("materialSelect");
+  const customInput = document.getElementById("customMaterialInput");
+  if (select.value === "Custom") {
+    customInput.classList.remove("hidden");
+  } else {
+    customInput.classList.add("hidden");
+    customInput.value = "";
+  }
+}
+
+// Call populateMaterialDropdown() when showing the add spool screen
+function showScreen(id) {
+  document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+
+  if (id === "library") renderLibrary();
+  if (id === "history") renderHistory();
+  if (id === "tracking") populateSpoolSelect();
+  if (id === "addSpool") populateMaterialDropdown();
+}
+
+// Save new spool (updated to handle custom material)
+function saveSpool() {
+  const brand = document.getElementById("brand").value.trim();
+  const color = document.getElementById("color").value.trim();
+
+  const materialSelect = document.getElementById("materialSelect");
+  let material = materialSelect.value;
+
+  const customMaterialInput = document.getElementById("customMaterialInput");
+  const customMaterial = customMaterialInput.value.trim();
+
+  if (material === "Custom") {
+    if (!customMaterial) {
+      alert("Please enter a custom material.");
+      return;
+    }
+    material = customMaterial;
+
+    // Add new custom material to materials list if not already there
+    if (!materialsList.includes(material)) {
+      materialsList.splice(materialsList.length - 1, 0, material); // Add before "Custom"
+      localStorage.setItem("materialsList", JSON.stringify(materialsList));
+    }
+  }
+
+  const length = parseFloat(document.getElementById("length").value);
+  const weight = parseFloat(document.getElementById("weight").value);
+
+  if (!brand || !color || !material || isNaN(length) || isNaN(weight)) {
+    alert("Please fill out all fields.");
+    return;
+  }
+
+  spoolLibrary.push({ brand, color, material, length, weight });
+  localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
+
+  // Reset form
+  document.getElementById("brand").value = "";
+  document.getElementById("color").value = "";
+  populateMaterialDropdown();
+  document.getElementById("length").value = "";
+  document.getElementById("weight").value = "";
+
+  alert("Spool saved!");
+  showScreen("library");
+}
