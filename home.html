@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Filament Tracker</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>Filament Tracker</header>
+
+<!-- Home Screen -->
+<div id="home" class="screen active">
+  <button onclick="showScreen('addSpool')">➕ Add New Spool</button>
+  <button onclick="showScreen('history')">📜 Usage History</button>
+  <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
+</div>
+
+<!-- Add Spool Screen -->
+<div id="addSpool" class="screen">
+  <h2>Add New Spool</h2>
+  <input type="text" id="spoolName" placeholder="Spool Name">
+  <input type="number" id="spoolWeight" placeholder="Weight (grams)">
+  <select id="spoolMaterial">
+    <option value="">Material Type</option>
+    <option value="PLA">PLA</option>
+    <option value="PETG">PETG</option>
+    <option value="ABS">ABS</option>
+    <option value="Other">Other</option>
+  </select>
+  <input type="color" id="spoolColor" value="#000000">
+  <button onclick="saveSpool()">💾 Save Spool</button>
+  <button class="back-btn" onclick="showScreen('home')">⬅ Back</button>
+</div>
+
+<!-- History Screen -->
+<div id="history" class="screen">
+  <h2>Usage History</h2>
+  <div id="historyList"></div>
+  <button class="back-btn" onclick="showScreen('home')">⬅ Back</button>
+</div>
+
+<!-- Tracking Screen -->
+<div id="tracking" class="screen">
+  <h2>Start Tracking</h2>
+  <p>(Tracking will go here when hardware is ready)</p>
+  <button class="back-btn" onclick="showScreen('home')">⬅ Back</button>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
