@@ -52,3 +52,56 @@ function loadHistory() {
     historyList.appendChild(div);
   });
 }
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js").then(registration => {
+    console.log("Service Worker registered");
+
+    // Listen for updates
+    registration.addEventListener("updatefound", () => {
+      const newWorker = registration.installing;
+      newWorker.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          showUpdatePrompt(() => {
+            newWorker.postMessage({ action: "skipWaiting" });
+          });
+        }
+      });
+    });
+  });
+
+  // Reload when the new SW activates
+  let refreshing;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!refreshing) {
+      window.location.reload();
+      refreshing = true;
+    }
+  });
+}
+
+// Show update prompt
+function showUpdatePrompt(onConfirm) {
+  const prompt = document.createElement("div");
+  prompt.style.position = "fixed";
+  prompt.style.bottom = "20px";
+  prompt.style.left = "50%";
+  prompt.style.transform = "translateX(-50%)";
+  prompt.style.background = "#007acc";
+  prompt.style.color = "white";
+  prompt.style.padding = "10px 20px";
+  prompt.style.borderRadius = "8px";
+  prompt.style.boxShadow = "0 4px 6px rgba(0,0,0,0.2)";
+  prompt.style.zIndex = "9999";
+  prompt.innerHTML = `
+    <span style="margin-right:10px;">Update available</span>
+    <button style="background:#fff;color:#007acc;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">Update</button>
+  `;
+
+  prompt.querySelector("button").addEventListener("click", () => {
+    document.body.removeChild(prompt);
+    onConfirm();
+  });
+
+  document.body.appendChild(prompt);
+}
