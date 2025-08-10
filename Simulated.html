@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filament Length Tracker - Simulation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 400px;
+      margin: auto;
+    }
+    #lengthDisplay {
+      font-size: 2em;
+      margin-bottom: 20px;
+      color: #007acc;
+    }
+    button {
+      font-size: 1em;
+      padding: 10px 15px;
+      margin-right: 10px;
+    }
+    #log {
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: #f9f9f9;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Filament Length Tracker (Simulated)</h1>
+  
+  <div>Current Filament Length: <span id="lengthDisplay">0.00</span> mm</div>
+
+  <button id="simulateBtn">Simulate Filament Use</button>
+  <button id="resetBtn">Reset Length</button>
+
+  <div id="log"></div>
+
+  <script>
+    let filamentLength = 0;
+    const lengthDisplay = document.getElementById('lengthDisplay');
+    const log = document.getElementById('log');
+
+    // Simulate filament usage: increase length by random 0.5-2 mm per click
+    document.getElementById('simulateBtn').addEventListener('click', () => {
+      const increment = (Math.random() * 1.5 + 0.5).toFixed(2);
+      filamentLength += parseFloat(increment);
+      updateDisplay();
+      logEvent(`+${increment} mm`);
+    });
+
+    // Reset filament length
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      filamentLength = 0;
+      updateDisplay();
+      logEvent('Reset length');
+    });
+
+    function updateDisplay() {
+      lengthDisplay.textContent = filamentLength.toFixed(2);
+    }
+
+    function logEvent(text) {
+      const timestamp = new Date().toLocaleTimeString();
+      log.innerHTML = `[${timestamp}] ${text}<br>` + log.innerHTML;
+    }
+  </script>
+
+</body>
+</html>
