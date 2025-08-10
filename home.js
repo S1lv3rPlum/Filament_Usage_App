@@ -103,20 +103,21 @@ function saveSpool() {
 // ----- Populate Spool Select in Tracking -----
 function populateSpoolSelect() {
   const select = document.getElementById("selectSpool");
-  select.innerHTML = "";
+  select.innerHTML = ""; // Clear existing options
 
-  if (spoolLibrary.length === 0) {
-    const option = document.createElement("option");
-    option.textContent = "No spools available";
-    option.value = "";
-    select.appendChild(option);
-    return;
-  }
+  // Add the default placeholder option
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";           // empty value means no spool selected
+  defaultOption.textContent = "~select a spool~";
+  defaultOption.disabled = true;      // user cannot select it once another option is chosen
+  defaultOption.selected = true;      // this option is selected by default
+  select.appendChild(defaultOption);
 
+  // Add the spools from the library
   spoolLibrary.forEach((spool, index) => {
     const option = document.createElement("option");
-    option.textContent = `${spool.brand} - ${spool.material} - ${spool.color}`;
-    option.value = index;
+    option.value = index;              // use index as value
+    option.textContent = `${spool.brand} - ${spool.color} - ${spool.material}`;
     select.appendChild(option);
   });
 }
