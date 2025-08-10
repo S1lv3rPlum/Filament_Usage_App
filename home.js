@@ -226,3 +226,40 @@ function showUpdatePrompt(onConfirm) {
 
   document.body.appendChild(prompt);
 }
+
+let newWorker = null; // To keep track of the waiting SW
+
+// Existing service worker registration code with updatefound event:
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js").then(registration => {
+    console.log("Service Worker registered");
+
+    registration.addEventListener("updatefound", () => {
+      newWorker = registration.installing;
+      newWorker.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          // New update available
+          showUpdatePrompt(() => {
+            newWorker.postMessage({ action: "skipWaiting" });
+          });
+        }
+      });
+    });
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    window.location.reload();
+  });
+}
+
+// Show update prompt UI (keep your existing showUpdatePrompt function)
+
+document.getElementById("checkUpdatesBtn").addEventListener("click", () => {
+  if (!newWorker) {
+    alert("No update available at this time.");
+  } else {
+    showUpdatePrompt(() => {
+      newWorker.postMessage({ action: "skipWaiting" });
+    });
+  }
+});
