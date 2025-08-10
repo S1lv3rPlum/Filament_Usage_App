@@ -78,15 +78,15 @@
    <script>
   // Delayed redirect with error fallback
   setTimeout(() => {
-    fetch('BrowseProducts.html')
+    fetch('home.html')
       .then(response => {
         if (response.ok) {
-          window.location.href = 'BrowseProducts.html';
+          window.location.href = 'home.html';
         } else {
-          alert("BrowseProducts.html not found.");
+          alert("home.html not found.");
         }
       })
-      .catch(() => alert("Network error. Couldn't load BrowseProducts.html."));
+      .catch(() => alert("Network error. Couldn't load home.html."));
   }, 3000);
 </script>
 
