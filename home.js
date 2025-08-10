@@ -1,270 +1,6 @@
-function showScreen(screenId) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(screenId).classList.add('active');
-  if (screenId === 'history') loadHistory();
-}
-
-function saveSpool() {
-  const name = document.getElementById('spoolName').value.trim();
-  const weight = document.getElementById('spoolWeight').value;
-  const material = document.getElementById('spoolMaterial').value;
-  const color = document.getElementById('spoolColor').value;
-
-  if (!name || !weight || !material) {
-    alert("Please fill out all required fields.");
-    return;
-  }
-
-  const spool = {
-    name,
-    weight: parseInt(weight),
-    material,
-    color,
-    date: new Date().toLocaleDateString()
-  };
-
-  let history = JSON.parse(localStorage.getItem('filamentHistory')) || [];
-  history.push(spool);
-  localStorage.setItem('filamentHistory', JSON.stringify(history));
-
-  alert("Spool saved!");
-  document.getElementById('spoolName').value = "";
-  document.getElementById('spoolWeight').value = "";
-  document.getElementById('spoolMaterial').value = "";
-  document.getElementById('spoolColor').value = "#000000";
-}
-
-function loadHistory() {
-  const historyList = document.getElementById('historyList');
-  historyList.innerHTML = "";
-
-  let history = JSON.parse(localStorage.getItem('filamentHistory')) || [];
-  if (history.length === 0) {
-    historyList.innerHTML = "<p>No history yet.</p>";
-    return;
-  }
-
-  history.forEach(item => {
-    const div = document.createElement('div');
-    div.classList.add('list-item');
-    div.innerHTML = `<strong>${item.name}</strong> - ${item.material} - ${item.weight}g - ${item.date}
-                     <br><span style="color:${item.color}">⬤</span>`;
-    historyList.appendChild(div);
-  });
-}
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/service-worker.js").then(registration => {
-    console.log("Service Worker registered");
-
-    // Listen for updates
-    registration.addEventListener("updatefound", () => {
-      const newWorker = registration.installing;
-      newWorker.addEventListener("statechange", () => {
-        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-          showUpdatePrompt(() => {
-            newWorker.postMessage({ action: "skipWaiting" });
-          });
-        }
-      });
-    });
-  });
-
-  // Reload when the new SW activates
-  let refreshing;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!refreshing) {
-      window.location.reload();
-      refreshing = true;
-    }
-  });
-}
-
-// Show update prompt
-function showUpdatePrompt(onConfirm) {
-  const prompt = document.createElement("div");
-  prompt.style.position = "fixed";
-  prompt.style.bottom = "20px";
-  prompt.style.left = "50%";
-  prompt.style.transform = "translateX(-50%)";
-  prompt.style.background = "#007acc";
-  prompt.style.color = "white";
-  prompt.style.padding = "10px 20px";
-  prompt.style.borderRadius = "8px";
-  prompt.style.boxShadow = "0 4px 6px rgba(0,0,0,0.2)";
-  prompt.style.zIndex = "9999";
-  prompt.innerHTML = `
-    <span style="margin-right:10px;">Update available</span>
-    <button style="background:#fff;color:#007acc;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">Update</button>
-  `;
-
-  prompt.querySelector("button").addEventListener("click", () => {
-    document.body.removeChild(prompt);
-    onConfirm();
-  });
-
-  document.body.appendChild(prompt);
-}
-
-// ----- Navigation -----
-function showScreen(id) {
-  document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
-
-  if (id === "library") renderLibrary();
-  if (id === "history") renderHistory();
-}
-
-// ----- Data Handling -----
+// ----- Data Storage -----
 let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
 let usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
-
-// Save new spool to inventory
-function saveSpool() {
-  const brand = document.getElementById("brand").value.trim();
-  const color = document.getElementById("color").value.trim();
-  const material = document.getElementById("material").value.trim();
-  const length = parseFloat(document.getElementById("length").value);
-  const weight = parseFloat(document.getElementById("weight").value);
-
-  if (!brand || !color || !material || isNaN(length) || isNaN(weight)) {
-    alert("Please fill out all fields");
-    return;
-  }
-
-  spoolLibrary.push({ brand, color, material, length, weight });
-  localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
-
-  document.getElementById("brand").value = "";
-  document.getElementById("color").value = "";
-  document.getElementById("material").value = "";
-  document.getElementById("length").value = "";
-  document.getElementById("weight").value = "";
-
-  alert("Spool saved!");
-  showScreen("library");
-}
-
-// Render spool inventory
-function renderLibrary() {
-  const list = document.getElementById("spoolList");
-  list.innerHTML = "";
-  if (spoolLibrary.length === 0) {
-    list.innerHTML = "<li>No spools in inventory</li>";
-    return;
-  }
-  spoolLibrary.forEach((spool, index) => {
-    const li = document.createElement("li");
-    li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${spool.length}m, ${spool.weight}g)`;
-    list.appendChild(li);
-  });
-}
-
-// Render usage history
-function renderHistory() {
-  const list = document.getElementById("historyList");
-  list.innerHTML = "";
-  if (usageHistory.length === 0) {
-    list.innerHTML = "<li>No usage recorded</li>";
-    return;
-  }
-  usageHistory.forEach(entry => {
-    const li = document.createElement("li");
-    li.textContent = `${entry.date} - ${entry.amount}g used from ${entry.spoolBrand}`;
-    list.appendChild(li);
-  });
-}
-
-// ----- PWA Service Worker Registration -----
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/service-worker.js").then(registration => {
-    console.log("Service Worker registered");
-
-    registration.addEventListener("updatefound", () => {
-      const newWorker = registration.installing;
-      newWorker.addEventListener("statechange", () => {
-        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-          showUpdatePrompt(() => {
-            newWorker.postMessage({ action: "skipWaiting" });
-          });
-        }
-      });
-    });
-  });
-
-  let refreshing;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!refreshing) {
-      window.location.reload();
-      refreshing = true;
-    }
-  });
-}
-
-// Update prompt UI
-function showUpdatePrompt(onConfirm) {
-  const prompt = document.createElement("div");
-  prompt.style.position = "fixed";
-  prompt.style.bottom = "20px";
-  prompt.style.left = "50%";
-  prompt.style.transform = "translateX(-50%)";
-  prompt.style.background = "#007acc";
-  prompt.style.color = "white";
-  prompt.style.padding = "10px 20px";
-  prompt.style.borderRadius = "8px";
-  prompt.style.boxShadow = "0 4px 6px rgba(0,0,0,0.2)";
-  prompt.style.zIndex = "9999";
-  prompt.innerHTML = `
-    <span style="margin-right:10px;">Update available</span>
-    <button style="background:#fff;color:#007acc;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">Update</button>
-  `;
-
-  prompt.querySelector("button").addEventListener("click", () => {
-    document.body.removeChild(prompt);
-    onConfirm();
-  });
-
-  document.body.appendChild(prompt);
-}
-
-let newWorker = null; // To keep track of the waiting SW
-
-// Existing service worker registration code with updatefound event:
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/service-worker.js").then(registration => {
-    console.log("Service Worker registered");
-
-    registration.addEventListener("updatefound", () => {
-      newWorker = registration.installing;
-      newWorker.addEventListener("statechange", () => {
-        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-          // New update available
-          showUpdatePrompt(() => {
-            newWorker.postMessage({ action: "skipWaiting" });
-          });
-        }
-      });
-    });
-  });
-
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    window.location.reload();
-  });
-}
-
-// Show update prompt UI (keep your existing showUpdatePrompt function)
-
-document.getElementById("checkUpdatesBtn").addEventListener("click", () => {
-  if (!newWorker) {
-    alert("No update available at this time.");
-  } else {
-    showUpdatePrompt(() => {
-      newWorker.postMessage({ action: "skipWaiting" });
-    });
-  }
-});
-
-// Load materials from localStorage or use default list
 let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
   "PLA",
   "ABS",
@@ -274,10 +10,25 @@ let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
   "Custom"
 ];
 
-// Populate the material dropdown options
+// ----- Screen Navigation -----
+function showScreen(id) {
+  document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+
+  if (id === "library") renderLibrary();
+  if (id === "history") renderHistory();
+  if (id === "tracking") populateSpoolSelect();
+  if (id === "addSpool") populateMaterialDropdown();
+  if (id === "analytics") renderAnalytics();
+  if (id === "settings") {
+    // Setup for settings if needed
+  }
+}
+
+// ----- Material Dropdown -----
 function populateMaterialDropdown() {
   const select = document.getElementById("materialSelect");
-  select.innerHTML = ""; // Clear current options
+  select.innerHTML = "";
 
   materialsList.forEach(material => {
     const option = document.createElement("option");
@@ -286,13 +37,11 @@ function populateMaterialDropdown() {
     select.appendChild(option);
   });
 
-  // Default to first material
   select.value = materialsList[0];
   document.getElementById("customMaterialInput").classList.add("hidden");
   document.getElementById("customMaterialInput").value = "";
 }
 
-// Show/hide custom input based on selection
 function handleMaterialChange() {
   const select = document.getElementById("materialSelect");
   const customInput = document.getElementById("customMaterialInput");
@@ -304,18 +53,7 @@ function handleMaterialChange() {
   }
 }
 
-// Call populateMaterialDropdown() when showing the add spool screen
-function showScreen(id) {
-  document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
-
-  if (id === "library") renderLibrary();
-  if (id === "history") renderHistory();
-  if (id === "tracking") populateSpoolSelect();
-  if (id === "addSpool") populateMaterialDropdown();
-}
-
-// Save new spool (updated to handle custom material)
+// ----- Save Spool -----
 function saveSpool() {
   const brand = document.getElementById("brand").value.trim();
   const color = document.getElementById("color").value.trim();
@@ -333,9 +71,9 @@ function saveSpool() {
     }
     material = customMaterial;
 
-    // Add new custom material to materials list if not already there
+    // Add new custom material if not already present
     if (!materialsList.includes(material)) {
-      materialsList.splice(materialsList.length - 1, 0, material); // Add before "Custom"
+      materialsList.splice(materialsList.length - 1, 0, material); // before "Custom"
       localStorage.setItem("materialsList", JSON.stringify(materialsList));
     }
   }
@@ -362,32 +100,28 @@ function saveSpool() {
   showScreen("library");
 }
 
-function renderAnalytics() {
-  const ctx = document.getElementById('usageChart').getContext('2d');
-  
-  // Aggregate data example: total length used per material
-  const usageByMaterial = {};
-  usageHistory.forEach(usage => {
-    usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + usage.lengthUsed;
-  });
-  
-  const labels = Object.keys(usageByMaterial);
-  const data = Object.values(usageByMaterial);
-  
-  new Chart(ctx, {
-    type: 'pie',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Filament Used (m)',
-        data: data,
-        backgroundColor: [/* colors */],
-      }]
-    }
+// ----- Populate Spool Select in Tracking -----
+function populateSpoolSelect() {
+  const select = document.getElementById("selectSpool");
+  select.innerHTML = "";
+
+  if (spoolLibrary.length === 0) {
+    const option = document.createElement("option");
+    option.textContent = "No spools available";
+    option.value = "";
+    select.appendChild(option);
+    return;
+  }
+
+  spoolLibrary.forEach((spool, index) => {
+    const option = document.createElement("option");
+    option.textContent = `${spool.brand} - ${spool.material} - ${spool.color}`;
+    option.value = index;
+    select.appendChild(option);
   });
 }
 
-
+// ----- Save Usage -----
 function saveUsage() {
   const select = document.getElementById("selectSpool");
   const selectedIndex = select.value;
@@ -405,7 +139,6 @@ function saveUsage() {
     return;
   }
 
-  // Your existing logic to save usage here, for example:
   usageHistory.push({
     spoolIndex: selectedIndex,
     spoolBrand: spool.brand,
@@ -419,3 +152,150 @@ function saveUsage() {
   alert("Usage saved!");
   showScreen("home");
 }
+
+// ----- Render Library -----
+function renderLibrary() {
+  const list = document.getElementById("spoolList");
+  list.innerHTML = "";
+
+  if (spoolLibrary.length === 0) {
+    list.innerHTML = "<li>No spools in inventory</li>";
+    return;
+  }
+
+  spoolLibrary.forEach((spool) => {
+    const li = document.createElement("li");
+    li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${spool.length}m, ${spool.weight}g)`;
+    list.appendChild(li);
+  });
+}
+
+// ----- Render History -----
+function renderHistory() {
+  const list = document.getElementById("historyList");
+  list.innerHTML = "";
+
+  if (usageHistory.length === 0) {
+    list.innerHTML = "<li>No usage recorded</li>";
+    return;
+  }
+
+  usageHistory.forEach(entry => {
+    const li = document.createElement("li");
+    const dateStr = new Date(entry.date).toLocaleString();
+    li.textContent = `${dateStr} - ${entry.lengthUsed}m used from ${entry.spoolBrand}`;
+    list.appendChild(li);
+  });
+}
+
+// ----- Render Analytics -----
+function renderAnalytics() {
+  const canvas = document.getElementById('usageChart');
+  if (!canvas) return; // Canvas might not exist if section hidden
+
+  const ctx = canvas.getContext('2d');
+
+  // Clear canvas for re-rendering (if you want to re-run multiple times)
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Aggregate usage by material
+  const usageByMaterial = {};
+  usageHistory.forEach(usage => {
+    usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + usage.lengthUsed;
+  });
+
+  const labels = Object.keys(usageByMaterial);
+  const data = Object.values(usageByMaterial);
+
+  // Destroy existing chart instance if exists to prevent overlap (optional, requires storing chart globally)
+  if (window.usageChartInstance) {
+    window.usageChartInstance.destroy();
+  }
+
+  window.usageChartInstance = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Filament Used (m)',
+        data: data,
+        backgroundColor: [
+          '#007acc', '#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40'
+        ],
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+    }
+  });
+}
+
+// ----- Service Worker Update Handling -----
+let newWorker = null;
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js").then(registration => {
+    console.log("Service Worker registered");
+
+    registration.addEventListener("updatefound", () => {
+      newWorker = registration.installing;
+      newWorker.addEventListener("statechange", () => {
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          showUpdatePrompt(() => {
+            newWorker.postMessage({ action: "skipWaiting" });
+          });
+        }
+      });
+    });
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    window.location.reload();
+  });
+}
+
+function showUpdatePrompt(onConfirm) {
+  const prompt = document.createElement("div");
+  prompt.style.position = "fixed";
+  prompt.style.bottom = "20px";
+  prompt.style.left = "50%";
+  prompt.style.transform = "translateX(-50%)";
+  prompt.style.background = "#007acc";
+  prompt.style.color = "white";
+  prompt.style.padding = "10px 20px";
+  prompt.style.borderRadius = "8px";
+  prompt.style.boxShadow = "0 4px 6px rgba(0,0,0,0.2)";
+  prompt.style.zIndex = "9999";
+  prompt.innerHTML = `
+    <span style="margin-right:10px;">Update available</span>
+    <button style="background:#fff;color:#007acc;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">Update</button>
+  `;
+
+  prompt.querySelector("button").addEventListener("click", () => {
+    document.body.removeChild(prompt);
+    onConfirm();
+  });
+
+  document.body.appendChild(prompt);
+}
+
+// ----- Setup check updates button -----
+document.addEventListener("DOMContentLoaded", () => {
+  const checkUpdatesBtn = document.getElementById("checkUpdatesBtn");
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener("click", () => {
+      if (!newWorker) {
+        alert("No update available at this time.");
+      } else {
+        showUpdatePrompt(() => {
+          newWorker.postMessage({ action: "skipWaiting" });
+        });
+      }
+    });
+  }
+
+  // Initialize by showing home screen and populating material dropdown
+  showScreen("home");
+  populateMaterialDropdown();
+});
