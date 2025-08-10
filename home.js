@@ -299,3 +299,41 @@ document.addEventListener("DOMContentLoaded", () => {
   showScreen("home");
   populateMaterialDropdown();
 });
+
+function renderAnalytics() {
+  const canvas = document.getElementById('usageChart');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+
+  // Aggregate usage data here (example)
+  const usageByMaterial = {};
+  usageHistory.forEach(usage => {
+    usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + usage.lengthUsed;
+  });
+
+  const labels = Object.keys(usageByMaterial);
+  const data = Object.values(usageByMaterial);
+
+  // Destroy previous chart instance if exists (optional)
+  if (window.usageChartInstance) {
+    window.usageChartInstance.destroy();
+  }
+
+  // Create new pie chart
+  window.usageChartInstance = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Filament Used (m)',
+        data: data,
+        backgroundColor: ['#007acc', '#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40'],
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+    }
+  });
+}
