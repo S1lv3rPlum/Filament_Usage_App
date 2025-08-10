@@ -59,3 +59,50 @@ input, select {
   font-size: 0.95em;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
+
+body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f4f4f4;
+  color: #333;
+}
+
+header {
+  background: #007acc;
+  color: white;
+  padding: 10px;
+  text-align: center;
+}
+
+main, section {
+  padding: 15px;
+}
+
+button {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 10px;
+  background: #007acc;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+button:hover {
+  background: #005f99;
+}
+
+.hidden {
+  display: none;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  margin: 5px 0;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
