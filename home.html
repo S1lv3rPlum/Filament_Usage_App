@@ -18,6 +18,7 @@
   <button onclick="showScreen('library')">📦 View Inventory</button>
   <button onclick="showScreen('history')">📜 Usage History</button>
   <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
+  <button onclick="showScreen('analytics')">📊 Analytics</button>
   <button onclick="showScreen('settings')">⚙️ Settings</button>
 </main>
 
@@ -79,6 +80,16 @@
     <ul id="historyList"></ul>
     <button onclick="showScreen('home')">⬅ Back</button>
   </section>
+  
+  <section id="analytics" class="hidden">
+  <h2>Analytics</h2>
+  <div id="analyticsContent">
+    <!-- Charts and stats will go here -->
+  </div>
+  <button onclick="showScreen('home')">⬅ Back</button>
+</section>
+  
+  
   
   <!-- Settings Screen -->
 <section id="settings" class="hidden">
