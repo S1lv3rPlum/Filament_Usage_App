@@ -361,3 +361,28 @@ function saveSpool() {
   alert("Spool saved!");
   showScreen("library");
 }
+
+function renderAnalytics() {
+  const ctx = document.getElementById('usageChart').getContext('2d');
+  
+  // Aggregate data example: total length used per material
+  const usageByMaterial = {};
+  usageHistory.forEach(usage => {
+    usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + usage.lengthUsed;
+  });
+  
+  const labels = Object.keys(usageByMaterial);
+  const data = Object.values(usageByMaterial);
+  
+  new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Filament Used (m)',
+        data: data,
+        backgroundColor: [/* colors */],
+      }]
+    }
+  });
+}
