@@ -23,17 +23,28 @@
 
 
 
-  <!-- Add Spool Screen -->
-  <section id="addSpool" class="hidden">
-    <h2>Add New Spool</h2>
-    <input id="brand" placeholder="Brand" />
-    <input id="color" placeholder="Color" />
-    <input id="material" placeholder="Material" />
-    <input id="length" type="number" placeholder="Length (m)" />
-    <input id="weight" type="number" placeholder="Weight (g)" />
-    <button onclick="saveSpool()">Save Spool</button>
-    <button onclick="showScreen('home')">⬅ Back</button>
-  </section>
+ <section id="addSpool" class="hidden">
+  <h2>Add New Spool</h2>
+  <input id="brand" placeholder="Brand" />
+  <input id="color" placeholder="Color" />
+  
+  <select id="materialSelect" onchange="handleMaterialChange()" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-bottom: 10px;">
+    <!-- Options inserted dynamically -->
+  </select>
+  
+  <input
+    type="text"
+    id="customMaterialInput"
+    placeholder="Enter custom material"
+    class="hidden"
+    style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-bottom: 10px;"
+  />
+  
+  <input id="length" type="number" placeholder="Length (m)" />
+  <input id="weight" type="number" placeholder="Weight (g)" />
+  <button onclick="saveSpool()">Save Spool</button>
+  <button onclick="showScreen('home')">⬅ Back</button>
+</section>
 
   <!-- Inventory Screen -->
   <section id="library" class="hidden">
