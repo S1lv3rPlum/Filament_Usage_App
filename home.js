@@ -354,12 +354,11 @@ function renderAnalytics() {
 let activePrintJob = null; // Will hold current job data
 
 function populateSpoolMultiSelect() {
-  const spools = JSON.parse(localStorage.getItem("spools")) || [];
   const select = document.getElementById("selectSpools");
   select.innerHTML = "";
-  spools.forEach((spool, index) => {
+  spoolLibrary.forEach((spool, index) => {
     const option = document.createElement("option");
-    option.value = spool.id || index;
+    option.value = index;  // use index, consistent with spoolLibrary
     option.textContent = `${spool.brand} - ${spool.color} (${spool.material})`;
     select.appendChild(option);
   });
