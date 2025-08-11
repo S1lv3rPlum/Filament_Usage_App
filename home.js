@@ -404,7 +404,7 @@ function showEndPrintSection() {
   activePrintJob.spools.forEach(spool => {
     const div = document.createElement("div");
     div.innerHTML = `
-      <label>Spool ${spool.spoolId} End Weight (g):</label>
+      <label>${spool.spoolLabel} End Weight (g):</label>
       <input type="number" id="endWeight_${spool.spoolId}" step="0.01" />
     `;
     container.appendChild(div);
