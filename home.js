@@ -18,13 +18,13 @@ function showScreen(id) {
   document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 
-  if (id === "library") renderLibrary();
-  if (id === "history") renderHistory();
+  // if (id === "library") renderLibrary();
+ //  if (id === "history") renderHistory();
 
-  if (id === "tracking") {
-    populateSpoolMultiSelect();
+ // if (id === "tracking") {
+ //   populateSpoolMultiSelect();
 
-    if (activePrintJob) {
+ //   if (activePrintJob) {
       document.getElementById("startPrintSection").classList.add("hidden");
       document.getElementById("endPrintSection").classList.remove("hidden");
       document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
