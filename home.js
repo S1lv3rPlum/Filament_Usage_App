@@ -516,53 +516,82 @@ function highlightSpool(spoolId) {
 
 // Populate spool filter dropdown
 function populateSpoolFilterDropdown() {
-  const select = document.getElementById("filterSpool");
-  select.innerHTML = '<option value="">All Spools</option>';
+  const spoolSelect = document.getElementById("filterSpool");
+  spoolSelect.innerHTML = '<option value="">All Spools</option>';
 
-  // Collect all unique spools ever used in history
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
-  const spoolsSet = new Set();
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  const uniqueLabels = new Set();
 
-  history.forEach(job => {
+  usageHistory.forEach(job => {
     job.spools.forEach(spool => {
-      spoolsSet.add(spool.spoolLabel);
+      uniqueLabels.add(spool.spoolLabel);
     });
   });
 
-  Array.from(spoolsSet).sort().forEach(spoolLabel => {
+  [...uniqueLabels].sort().forEach(label => {
     const option = document.createElement("option");
-    option.value = spoolLabel;
-    option.textContent = spoolLabel;
-    select.appendChild(option);
+    option.value = label;
+    option.textContent = label;
+    spoolSelect.appendChild(option);
   });
 }
 
-// Render history with optional filters
-function renderHistoryFiltered(startDate, endDate, spoolLabel) {
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
+function renderHistoryFiltered() {
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+
+  const startDate = document.getElementById("filterStartDate").value;
+  const endDate = document.getElementById("filterEndDate").value;
+  const spoolLabel = document.getElementById("filterSpool").value;
+
+  console.log("Filtering usage history with:", { startDate, endDate, spoolLabel });
+
+  const filtered = usageHistory.filter(job => {
+    const jobDate = new Date(job.startTime);
+    
+    if (startDate && jobDate < new Date(startDate)) return false;
+    if (endDate && jobDate > new Date(endDate)) return false;
+
+    if (!spoolLabel) return true;
+
+    return job.spools.some(s => s.spoolLabel.toLowerCase().includes(spoolLabel.toLowerCase()));
+  });
+
+  console.log("Filtered jobs count:", filtered.length);
+
   const list = document.getElementById("historyList");
   list.innerHTML = "";
 
-  // Convert date strings to Date objects for comparison
-  const start = startDate ? new Date(startDate) : null;
-  const end = endDate ? new Date(endDate) : null;
+  if (filtered.length === 0) {
+    list.innerHTML = "<li>No usage history found for the selected filters.</li>";
+    return;
+  }
 
-  // Filter jobs by date and spool
-  const filteredJobs = history.filter(job => {
-    const jobStart = new Date(job.startTime);
-    const jobEnd = new Date(job.endTime);
+  filtered.forEach(job => {
+    const li = document.createElement("li");
 
-    // Check date range
-    if (start && jobEnd < start) return false;
-    if (end && jobStart > end) return false;
+    let spoolDetails = job.spools.map((s) =>
+      `<a href="#" class="spool-link" data-spool-index="${s.spoolId}">${s.spoolLabel}</a>: ${s.used.toFixed(2)} g used`
+    ).join("<br>");
 
-    // Check spool filter
-    if (spoolLabel) {
-      const usesSpool = job.spools.some(s => s.spoolLabel === spoolLabel);
-      if (!usesSpool) return false;
-    }
-    return true;
+    li.innerHTML = `
+      <strong>${job.jobName}</strong> 
+      <small>(${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()})</small>
+      <br>${spoolDetails}
+    `;
+
+    list.appendChild(li);
   });
+
+  // Add click handlers to spool links
+  document.querySelectorAll('.spool-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const spoolIndex = e.target.getAttribute('data-spool-index');
+      showScreen('library');
+      highlightSpool(spoolIndex);
+    });
+  });
+}
 
   if (filteredJobs.length === 0) {
     list.innerHTML = "<li>No usage history available for selected filters.</li>";
