@@ -358,7 +358,7 @@ function populateSpoolMultiSelect() {
   select.innerHTML = "";
   spoolLibrary.forEach((spool, index) => {
     const option = document.createElement("option");
-    option.value = index;  // use index, consistent with spoolLibrary
+    option.value = index;  // use index consistent with spoolLibrary array
     option.textContent = `${spool.brand} - ${spool.color} (${spool.material})`;
     select.appendChild(option);
   });
