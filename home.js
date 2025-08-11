@@ -357,20 +357,29 @@ function populateSpoolMultiSelect() {
 function startPrintJob() {
   const jobName = document.getElementById("jobName").value.trim();
   const selectedOptions = Array.from(document.getElementById("selectSpools").selectedOptions);
+  const allSpools = JSON.parse(localStorage.getItem("spools")) || [];
 
   if (selectedOptions.length === 0) {
     alert("Please select at least one spool.");
     return;
   }
 
-  // Build spool data with start weights
   const spools = selectedOptions.map(opt => {
     const startWeight = parseFloat(document.getElementById(`startWeight_${opt.value}`).value);
     if (isNaN(startWeight)) {
       alert("Please enter all start weights.");
       throw new Error("Missing start weights");
     }
-    return { spoolId: opt.value, startWeight };
+
+    // Find the spool in inventory for display purposes
+    const spoolInfo = allSpools.find(s => (s.id || s.index) == opt.value) || {};
+    const label = `${spoolInfo.brand || "Unknown"} - ${spoolInfo.color || "?"} (${spoolInfo.material || "?"})`;
+
+    return {
+      spoolId: opt.value,
+      spoolLabel: label,
+      startWeight
+    };
   });
 
   activePrintJob = {
@@ -382,7 +391,6 @@ function startPrintJob() {
 
   localStorage.setItem("activePrintJob", JSON.stringify(activePrintJob));
 
-  // Switch UI to end print mode
   showEndPrintSection();
 }
 
