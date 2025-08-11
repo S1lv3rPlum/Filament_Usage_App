@@ -20,8 +20,8 @@ function showScreen(id) {
   document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 
-  if (id === "library") renderLibrary();
-  else if (id === "history") renderHistory();
+  if (id === "library") Library();
+  else if (id === "history") History();
   else if (id === "tracking") {
     populateSpoolMultiSelect();
 
@@ -36,13 +36,13 @@ function showScreen(id) {
   } else if (id === "addSpool") {
     populateMaterialDropdown();
   } else if (id === "analytics") {
-    renderAnalytics();
+    Analytics();
   } else if (id === "settings") {
     // Setup for settings if needed
   }
 }
 
-function renderAnalytics() {
+function Analytics() {
   const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
   const materialUsage = {};
 
@@ -229,8 +229,8 @@ function saveUsage() {
   showScreen("home");
 }
 
-// ----- Render Library -----
-function renderLibrary() {
+// -----  Library -----
+function Library() {
   const list = document.getElementById("spoolList");
   list.innerHTML = "";
   if (spoolLibrary.length === 0) {
@@ -410,8 +410,8 @@ function populateSpoolFilterDropdown() {
   });
 }
 
-// ----- Render History with Filters -----
-function renderHistoryFiltered() {
+// -----  History with Filters -----
+function HistoryFiltered() {
   const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
   const startDateVal = document.getElementById("filterStartDate").value;
@@ -469,20 +469,20 @@ function renderHistoryFiltered() {
 
 // ----- Apply and Clear Filters -----
 function applyFilters() {
-  renderHistoryFiltered();
+  HistoryFiltered();
 }
 
 function clearFilters() {
   document.getElementById("filterStartDate").value = "";
   document.getElementById("filterEndDate").value = "";
   document.getElementById("filterSpool").value = "";
-  renderHistoryFiltered();
+  HistoryFiltered();
 }
 
-// ----- Render History (initial) -----
-function renderHistory() {
+// -----  History (initial) -----
+function History() {
   populateSpoolFilterDropdown();
-  renderHistoryFiltered();
+  HistoryFiltered();
   setupLiveFilters();
 }
 
@@ -494,7 +494,7 @@ function setupLiveFilters() {
   const clearBtn = document.getElementById("clearFiltersBtn");
 
   function updateFilters() {
-    renderHistoryFiltered();
+    HistoryFiltered();
   }
 
   startDateInput.addEventListener("change", updateFilters);
@@ -581,3 +581,61 @@ document.addEventListener("DOMContentLoaded", () => {
 
   populateMaterialDropdown();
 });
+
+
+function renderAnalytics() {
+  console.log("renderAnalytics called");
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  const materialUsage = {};
+
+  usageHistory.forEach(job => {
+    job.spools.forEach(spool => {
+      const material = spool.spoolLabel.match(/\(([^)]+)\)/)?.[1] || "Unknown";
+      const used = spool.used || 0;
+      materialUsage[material] = (materialUsage[material] || 0) + used;
+    });
+  });
+
+  const labels = Object.keys(materialUsage);
+  const data = labels.map(label => materialUsage[label]);
+  console.log("Labels:", labels, "Data:", data);
+
+  if (labels.length === 0) {
+    console.warn("No usage data to display");
+  }
+
+  const ctx = document.getElementById("usageChart").getContext("2d");
+
+  if (window.usageChartInstance) {
+    window.usageChartInstance.destroy();
+  }
+
+  window.usageChartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Filament Used (grams)",
+        data,
+        backgroundColor: "rgba(0, 122, 204, 0.7)",
+        borderColor: "rgba(0, 122, 204, 1)",
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "Grams Used" }
+        },
+        x: {
+          title: { display: true, text: "Material" }
+        }
+      },
+      plugins: {
+        legend: { display: true, position: "top" },
+        tooltip: { enabled: true }
+      }
+    }
+  });
+}
