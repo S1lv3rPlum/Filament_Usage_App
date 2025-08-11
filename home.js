@@ -17,7 +17,20 @@ function showScreen(id) {
 
   if (id === "library") renderLibrary();
   if (id === "history") renderHistory();
-  if (id === "tracking") populateSpoolMultiSelect();
+
+  if (id === "tracking") {
+    populateSpoolMultiSelect();
+
+    if (activePrintJob) {
+      document.getElementById("startPrintSection").classList.add("hidden");
+      document.getElementById("endPrintSection").classList.remove("hidden");
+      document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
+    } else {
+      document.getElementById("startPrintSection").classList.remove("hidden");
+      document.getElementById("endPrintSection").classList.add("hidden");
+    }
+  }
+
   if (id === "addSpool") populateMaterialDropdown();
   if (id === "analytics") renderAnalytics();
   if (id === "settings") {
