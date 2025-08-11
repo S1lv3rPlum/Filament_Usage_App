@@ -539,24 +539,26 @@ function populateSpoolFilterDropdown() {
 function renderHistoryFiltered() {
   const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
-  const startDate = document.getElementById("filterStartDate").value;
-  const endDate = document.getElementById("filterEndDate").value;
+  const startDateVal = document.getElementById("filterStartDate").value;
+  const endDateVal = document.getElementById("filterEndDate").value;
   const spoolLabel = document.getElementById("filterSpool").value;
 
-  console.log("Filtering usage history with:", { startDate, endDate, spoolLabel });
+  const startDate = startDateVal ? new Date(startDateVal) : null;
+  const endDate = endDateVal ? new Date(endDateVal) : null;
+  if (endDate) {
+    endDate.setHours(23,59,59,999); // include whole day
+  }
 
   const filtered = usageHistory.filter(job => {
     const jobDate = new Date(job.startTime);
-    
-    if (startDate && jobDate < new Date(startDate)) return false;
-    if (endDate && jobDate > new Date(endDate)) return false;
+
+    if (startDate && jobDate < startDate) return false;
+    if (endDate && jobDate > endDate) return false;
 
     if (!spoolLabel) return true;
 
     return job.spools.some(s => s.spoolLabel.toLowerCase().includes(spoolLabel.toLowerCase()));
   });
-
-  console.log("Filtered jobs count:", filtered.length);
 
   const list = document.getElementById("historyList");
   list.innerHTML = "";
@@ -581,6 +583,17 @@ function renderHistoryFiltered() {
 
     list.appendChild(li);
   });
+
+  // Add click handlers to spool links
+  document.querySelectorAll('.spool-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const spoolIndex = e.target.getAttribute('data-spool-index');
+      showScreen('library');
+      highlightSpool(spoolIndex);
+    });
+  });
+}
 
   // Add click handlers to spool links
   document.querySelectorAll('.spool-link').forEach(link => {
