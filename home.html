@@ -60,17 +60,22 @@
   <h2>Print Job Tracking</h2>
 
   <!-- Start Print Form -->
-  <div id="startPrintSection">
-    <input id="jobName" placeholder="Print Job Name" />
+ <section id="startPrintSection">
+  <h2>Start Print Job</h2>
+  <input id="jobName" placeholder="Enter print job name (optional)" />
+  <label for="selectSpools">Select Spools (multi-select):</label>
+  <select id="selectSpools" multiple size="5" style="width: 100%;"></select>
+  <div id="startWeightsContainer"></div>
+  <button onclick="startPrintJob()">Start Print</button>
+</section>
 
-    <label for="selectSpools">Select Spools:</label>
-    <select id="selectSpools" multiple></select>
-
-    <div id="startWeightsContainer"></div>
-
-    <button onclick="startPrintJob()">Start Print</button>
-    <button onclick="showScreen('home')">⬅ Back</button>
-  </div>
+<section id="endPrintSection" class="hidden">
+  <h2>End Print Job</h2>
+  <div id="activeJobName"></div>
+  <div id="endWeightsContainer"></div>
+  <button onclick="saveEndPrintJob()">Save Print Job</button>
+  <button onclick="cancelActiveJob()">Cancel Print Job</button>
+</section>
 
   <!-- End Print Form -->
   <div id="endPrintSection" class="hidden">
