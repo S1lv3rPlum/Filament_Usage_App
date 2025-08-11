@@ -17,7 +17,7 @@ function showScreen(id) {
 
   if (id === "library") renderLibrary();
   if (id === "history") renderHistory();
-  if (id === "tracking") populateSpoolSelect();
+  if (id === "tracking") populateSpoolMultiSelect();
   if (id === "addSpool") populateMaterialDropdown();
   if (id === "analytics") renderAnalytics();
   if (id === "settings") {
