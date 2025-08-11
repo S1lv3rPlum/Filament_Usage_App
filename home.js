@@ -367,7 +367,7 @@ function populateSpoolMultiSelect() {
 function startPrintJob() {
   const jobName = document.getElementById("jobName").value.trim();
   const selectedOptions = Array.from(document.getElementById("selectSpools").selectedOptions);
-  const allSpools = JSON.parse(localStorage.getItem("spools")) || [];
+  const allSpools = spoolLibrary; JSON.parse(localStorage.getItem("spools")) || [];
 
   if (selectedOptions.length === 0) {
     alert("Please select at least one spool.");
@@ -435,7 +435,7 @@ function endPrintJob() {
     spoolData.gramsUsed = spoolData.startWeight - endWeight;
 
     // Update spool in inventory
-    const spoolIndex = spools.findIndex(s => (s.id || s.index) == spoolData.spoolId);
+   const spoolIndex = parseInt(spoolData.spoolId, 10);
     if (spoolIndex !== -1) {
       spools[spoolIndex].weight = endWeight;
     }
