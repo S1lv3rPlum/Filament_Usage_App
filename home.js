@@ -527,3 +527,27 @@ function saveEndPrintJob() {
   showScreen("history");
   renderHistory();
 }
+
+function highlightSpool(spoolId) {
+  const spoolList = document.getElementById('spoolList');
+  const items = spoolList.querySelectorAll('li');
+  
+  // Clear any previous highlights
+  items.forEach(item => item.style.backgroundColor = '');
+
+  // Find the li that corresponds to the spoolId
+  // Assuming you render each <li> in library with a data attribute 'data-spool-id'
+  const targetItem = [...items].find(li => li.getAttribute('data-spool-id') === spoolId);
+
+  if (targetItem) {
+    // Scroll it into view
+    targetItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Highlight with yellow background
+    targetItem.style.backgroundColor = 'yellow';
+
+    // Remove highlight after 3 seconds
+    setTimeout(() => {
+      targetItem.style.backgroundColor = '';
+    }, 3000);
+  }
+}
