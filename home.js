@@ -158,14 +158,13 @@ function saveUsage() {
 function renderLibrary() {
   const list = document.getElementById("spoolList");
   list.innerHTML = "";
-
   if (spoolLibrary.length === 0) {
     list.innerHTML = "<li>No spools in inventory</li>";
     return;
   }
-
-  spoolLibrary.forEach((spool) => {
+  spoolLibrary.forEach((spool, index) => {
     const li = document.createElement("li");
+    li.setAttribute('data-spool-id', index.toString());  // Set data attribute for id
     li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${spool.length}m, ${spool.weight}g)`;
     list.appendChild(li);
   });
