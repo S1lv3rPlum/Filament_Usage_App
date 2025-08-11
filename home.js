@@ -338,3 +338,138 @@ function renderAnalytics() {
     }
   });
 }
+
+
+let activePrintJob = null; // Will hold current job data
+
+function populateSpoolMultiSelect() {
+  const spools = JSON.parse(localStorage.getItem("spools")) || [];
+  const select = document.getElementById("selectSpools");
+  select.innerHTML = "";
+  spools.forEach((spool, index) => {
+    const option = document.createElement("option");
+    option.value = spool.id || index;
+    option.textContent = `${spool.brand} - ${spool.color} (${spool.material})`;
+    select.appendChild(option);
+  });
+}
+
+function startPrintJob() {
+  const jobName = document.getElementById("jobName").value.trim();
+  const selectedOptions = Array.from(document.getElementById("selectSpools").selectedOptions);
+
+  if (selectedOptions.length === 0) {
+    alert("Please select at least one spool.");
+    return;
+  }
+
+  // Build spool data with start weights
+  const spools = selectedOptions.map(opt => {
+    const startWeight = parseFloat(document.getElementById(`startWeight_${opt.value}`).value);
+    if (isNaN(startWeight)) {
+      alert("Please enter all start weights.");
+      throw new Error("Missing start weights");
+    }
+    return { spoolId: opt.value, startWeight };
+  });
+
+  activePrintJob = {
+    jobId: Date.now(),
+    jobName: jobName || `Print ${new Date().toLocaleString()}`,
+    spools,
+    startTime: new Date().toISOString(),
+  };
+
+  localStorage.setItem("activePrintJob", JSON.stringify(activePrintJob));
+
+  // Switch UI to end print mode
+  showEndPrintSection();
+}
+
+function showEndPrintSection() {
+  document.getElementById("startPrintSection").classList.add("hidden");
+  document.getElementById("endPrintSection").classList.remove("hidden");
+  document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
+
+  const container = document.getElementById("endWeightsContainer");
+  container.innerHTML = "";
+  activePrintJob.spools.forEach(spool => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label>Spool ${spool.spoolId} End Weight (g):</label>
+      <input type="number" id="endWeight_${spool.spoolId}" step="0.01" />
+    `;
+    container.appendChild(div);
+  });
+}
+
+function endPrintJob() {
+  const spools = JSON.parse(localStorage.getItem("spools")) || [];
+  const history = JSON.parse(localStorage.getItem("history")) || [];
+
+  activePrintJob.spools.forEach(spoolData => {
+    const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
+    if (isNaN(endWeight)) {
+      alert("Please enter all end weights.");
+      throw new Error("Missing end weights");
+    }
+    spoolData.endWeight = endWeight;
+    spoolData.gramsUsed = spoolData.startWeight - endWeight;
+
+    // Update spool in inventory
+    const spoolIndex = spools.findIndex(s => (s.id || s.index) == spoolData.spoolId);
+    if (spoolIndex !== -1) {
+      spools[spoolIndex].weight = endWeight;
+    }
+
+    // Add to history
+    history.push({
+      jobName: activePrintJob.jobName,
+      spoolId: spoolData.spoolId,
+      gramsUsed: spoolData.gramsUsed,
+      date: new Date().toISOString()
+    });
+  });
+
+  // Save updates
+  localStorage.setItem("spools", JSON.stringify(spools));
+  localStorage.setItem("history", JSON.stringify(history));
+  localStorage.removeItem("activePrintJob");
+
+  activePrintJob = null;
+  alert("Print job ended and usage recorded.");
+  showScreen("home");
+}
+
+function cancelActiveJob() {
+  if (confirm("Cancel the active print job? Progress will be lost.")) {
+    localStorage.removeItem("activePrintJob");
+    activePrintJob = null;
+    showScreen("home");
+  }
+}
+
+// UI helper to show start weights when spools selected
+document.getElementById("selectSpools").addEventListener("change", () => {
+  const container = document.getElementById("startWeightsContainer");
+  container.innerHTML = "";
+  const selected = Array.from(document.getElementById("selectSpools").selectedOptions);
+  selected.forEach(opt => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label>${opt.text} Start Weight (g):</label>
+      <input type="number" id="startWeight_${opt.value}" step="0.01" />
+    `;
+    container.appendChild(div);
+  });
+});
+
+// Restore job if page reloads
+window.addEventListener("load", () => {
+  populateSpoolMultiSelect();
+  const savedJob = JSON.parse(localStorage.getItem("activePrintJob"));
+  if (savedJob) {
+    activePrintJob = savedJob;
+    showEndPrintSection();
+  }
+});
