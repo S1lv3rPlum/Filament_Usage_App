@@ -481,3 +481,37 @@ window.addEventListener("load", () => {
     showEndPrintSection();
   }
 });
+
+function saveEndPrintJob() {
+  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
+
+  const endTime = new Date().toISOString();
+  const updatedSpools = activePrintJob.spools.map(spool => {
+    const endWeight = parseFloat(document.getElementById(`endWeight_${spool.spoolId}`).value);
+    if (isNaN(endWeight)) {
+      alert("Please enter all end weights.");
+      throw new Error("Missing end weights");
+    }
+    return {
+      ...spool,
+      endWeight,
+      used: spool.startWeight - endWeight
+    };
+  });
+
+  history.push({
+    jobId: activePrintJob.jobId,
+    jobName: activePrintJob.jobName,
+    spools: updatedSpools,
+    startTime: activePrintJob.startTime,
+    endTime
+  });
+
+  localStorage.setItem("usageHistory", JSON.stringify(history));
+  localStorage.removeItem("activePrintJob");
+
+  activePrintJob = null;
+  alert("Print job saved.");
+  showScreen("history");
+  renderHistory();
+}
