@@ -57,6 +57,28 @@
 
 <section id="history" class="hidden">
   <h2>Usage History</h2>
+
+  <!-- Filters -->
+  <div id="filters" style="margin-bottom: 1em;">
+    <label>
+      Start Date: 
+      <input type="date" id="filterStartDate" />
+    </label>
+    <label style="margin-left:1em;">
+      End Date: 
+      <input type="date" id="filterEndDate" />
+    </label>
+    <label style="margin-left:1em;">
+      Filter by Spool: 
+      <select id="filterSpool">
+        <option value="">All Spools</option>
+        <!-- options added dynamically -->
+      </select>
+    </label>
+    <button onclick="applyFilters()">Apply Filters</button>
+    <button onclick="clearFilters()" style="margin-left: 0.5em;">Clear</button>
+  </div>
+
   <ul id="historyList"></ul>
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
