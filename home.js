@@ -332,8 +332,8 @@ function populateSpoolMultiSelect() {
   select.innerHTML = "";
   spoolLibrary.forEach((spool, index) => {
     const option = document.createElement("option");
-    option.value = index;  // use index consistent with spoolLibrary array
-    option.textContent = `${spool.brand} - ${spool.color} (${spool.material})`;
+    option.value = index;  // keep index as value
+    option.textContent = `${spool.brand} - ${spool.color} (${spool.material}) (${spool.weight}g)`;  // added weight here
     select.appendChild(option);
   });
 }
@@ -349,14 +349,15 @@ function startPrintJob() {
   }
 
   const spools = selectedOptions.map(opt => {
-    const startWeight = parseFloat(document.getElementById(`startWeight_${opt.value}`).value);
-    if (isNaN(startWeight)) {
-      alert("Please enter all start weights.");
-      throw new Error("Missing start weights");
+    // Use the current weight from spoolLibrary directly, no need to ask for start weight input
+    const spoolInfo = allSpools[opt.value] || {};
+    const startWeight = spoolInfo.weight;
+    if (typeof startWeight !== "number" || isNaN(startWeight)) {
+      alert("Spool weight data missing or invalid.");
+      throw new Error("Invalid start weight");
     }
 
-    const spoolInfo = allSpools[opt.value] || {};
-    const label = `${spoolInfo.brand || "Unknown"} - ${spoolInfo.color || "?"} (${spoolInfo.material || "?"})`;
+    const label = `${spoolInfo.brand || "Unknown"} - ${spoolInfo.color || "?"} (${spoolInfo.material || "?"}) (${startWeight}g)`;
 
     return {
       spoolId: opt.value,
@@ -406,9 +407,10 @@ function endPrintJob() {
     }
     const gramsUsed = spoolData.startWeight - endWeight;
 
-    const spoolIndex = spools.findIndex(s => spoolLibrary.indexOf(s) == spoolData.spoolId);
+    // Find the correct spool index in the current spools array
+    const spoolIndex = parseInt(spoolData.spoolId, 10);
     if (spoolIndex !== -1) {
-      spools[spoolIndex].weight = endWeight;
+      spools[spoolIndex].weight = endWeight;  // update weight
     }
 
     return {
@@ -418,6 +420,26 @@ function endPrintJob() {
       used: gramsUsed,
     };
   });
+
+  // Save updated spools and history
+  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
+  
+  history.push({
+    jobId: activePrintJob.jobId,
+    jobName: activePrintJob.jobName,
+    spools: updatedSpools,
+    startTime: activePrintJob.startTime,
+    endTime: new Date().toISOString()
+  });
+
+  localStorage.setItem("usageHistory", JSON.stringify(history));
+  localStorage.removeItem("activePrintJob");
+  activePrintJob = null;
+
+  alert("Print job ended and usage recorded.");
+  showScreen("home");
+  renderHistory();
+}
 
   history.push({
     jobId: activePrintJob.jobId,
