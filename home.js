@@ -102,7 +102,7 @@ function saveSpool() {
 
 // ----- Populate Spool Select in Tracking -----
 function populateSpoolSelect() {
-  const select = document.getElementById("selectSpool");
+  const select = document.getElementById("selectSpools");  // FIXED ID here
   select.innerHTML = ""; // Clear existing options
 
   // Add the default placeholder option
@@ -124,7 +124,7 @@ function populateSpoolSelect() {
 
 // ----- Save Usage -----
 function saveUsage() {
-  const select = document.getElementById("selectSpool");
+  const select = document.getElementById("selectSpools");
   const selectedIndex = select.value;
 
   if (selectedIndex === "") {
@@ -173,7 +173,7 @@ function renderLibrary() {
 // ----- Render History -----
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
-  const list = document.getElementById("historyList");
+  const list = document.getElementById("historyList");  // Ensure this element exists in HTML
   list.innerHTML = "";
 
   history.forEach(job => {
@@ -312,45 +312,6 @@ document.addEventListener("DOMContentLoaded", () => {
   populateMaterialDropdown();
 });
 
-function renderAnalytics() {
-  const canvas = document.getElementById('usageChart');
-  if (!canvas) return;
-
-  const ctx = canvas.getContext('2d');
-
-  // Aggregate usage data here (example)
-  const usageByMaterial = {};
-  usageHistory.forEach(usage => {
-    usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + usage.lengthUsed;
-  });
-
-  const labels = Object.keys(usageByMaterial);
-  const data = Object.values(usageByMaterial);
-
-  // Destroy previous chart instance if exists (optional)
-  if (window.usageChartInstance) {
-    window.usageChartInstance.destroy();
-  }
-
-  // Create new pie chart
-  window.usageChartInstance = new Chart(ctx, {
-    type: 'pie',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Filament Used (m)',
-        data: data,
-        backgroundColor: ['#007acc', '#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40'],
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-    }
-  });
-}
-
-
 let activePrintJob = null; // Will hold current job data
 
 function populateSpoolMultiSelect() {
@@ -367,7 +328,7 @@ function populateSpoolMultiSelect() {
 function startPrintJob() {
   const jobName = document.getElementById("jobName").value.trim();
   const selectedOptions = Array.from(document.getElementById("selectSpools").selectedOptions);
-  const allSpools = spoolLibrary; JSON.parse(localStorage.getItem("spools")) || [];
+  const allSpools = spoolLibrary;
 
   if (selectedOptions.length === 0) {
     alert("Please select at least one spool.");
@@ -381,8 +342,7 @@ function startPrintJob() {
       throw new Error("Missing start weights");
     }
 
-    // Find the spool in inventory for display purposes
-    const spoolInfo = allSpools.find(s => (s.id || s.index) == opt.value) || {};
+    const spoolInfo = allSpools[opt.value] || {};
     const label = `${spoolInfo.brand || "Unknown"} - ${spoolInfo.color || "?"} (${spoolInfo.material || "?"})`;
 
     return {
@@ -425,7 +385,6 @@ function endPrintJob() {
   const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
   const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
-  // Gather updated spool data with end weights and usage
   const updatedSpools = activePrintJob.spools.map(spoolData => {
     const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
     if (isNaN(endWeight)) {
@@ -434,8 +393,7 @@ function endPrintJob() {
     }
     const gramsUsed = spoolData.startWeight - endWeight;
 
-    // Update spool weight in inventory
-    const spoolIndex = spools.findIndex(s => s.id == spoolData.spoolId || s.index == spoolData.spoolId || spoolLibrary.indexOf(s) == spoolData.spoolId);
+    const spoolIndex = spools.findIndex(s => spoolLibrary.indexOf(s) == spoolData.spoolId);
     if (spoolIndex !== -1) {
       spools[spoolIndex].weight = endWeight;
     }
@@ -444,11 +402,10 @@ function endPrintJob() {
       ...spoolData,
       endWeight,
       gramsUsed,
-      used: gramsUsed,  // for consistency with other parts of your code
+      used: gramsUsed,
     };
   });
 
-  // Add job usage record to history
   history.push({
     jobId: activePrintJob.jobId,
     jobName: activePrintJob.jobName,
@@ -457,7 +414,6 @@ function endPrintJob() {
     endTime: new Date().toISOString()
   });
 
-  // Save updated data and clear active job
   localStorage.setItem("spoolLibrary", JSON.stringify(spools));
   localStorage.setItem("usageHistory", JSON.stringify(history));
   localStorage.removeItem("activePrintJob");
@@ -465,17 +421,7 @@ function endPrintJob() {
 
   alert("Print job ended and usage recorded.");
   showScreen("home");
-  renderHistory();  // refresh history screen in case user navigates there
-}
-
-  // Save updates
-  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
-  localStorage.setItem("usageHistory", JSON.stringify(history));
-  localStorage.removeItem("activePrintJob");
-
-  activePrintJob = null;
-  alert("Print job ended and usage recorded.");
-  showScreen("home");
+  renderHistory();
 }
 
 function cancelActiveJob() {
@@ -510,25 +456,6 @@ window.addEventListener("load", () => {
     showEndPrintSection();
   }
 });
-
-
-
-  history.push({
-    jobId: activePrintJob.jobId,
-    jobName: activePrintJob.jobName,
-    spools: updatedSpools,
-    startTime: activePrintJob.startTime,
-    endTime
-  });
-
-  localStorage.setItem("usageHistory", JSON.stringify(history));
-  localStorage.removeItem("activePrintJob");
-
-  activePrintJob = null;
-  alert("Print job saved.");
-  showScreen("history");
-  renderHistory();
-}
 
 function highlightSpool(spoolId) {
   const spoolList = document.getElementById('spoolList');
