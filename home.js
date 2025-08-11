@@ -425,29 +425,48 @@ function endPrintJob() {
   const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
   const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
-  activePrintJob.spools.forEach(spoolData => {
+  // Gather updated spool data with end weights and usage
+  const updatedSpools = activePrintJob.spools.map(spoolData => {
     const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
     if (isNaN(endWeight)) {
       alert("Please enter all end weights.");
       throw new Error("Missing end weights");
     }
-    spoolData.endWeight = endWeight;
-    spoolData.gramsUsed = spoolData.startWeight - endWeight;
+    const gramsUsed = spoolData.startWeight - endWeight;
 
-    // Update spool in inventory
-   const spoolIndex = parseInt(spoolData.spoolId, 10);
+    // Update spool weight in inventory
+    const spoolIndex = spools.findIndex(s => s.id == spoolData.spoolId || s.index == spoolData.spoolId || spoolLibrary.indexOf(s) == spoolData.spoolId);
     if (spoolIndex !== -1) {
       spools[spoolIndex].weight = endWeight;
     }
 
-    // Add to history
-    history.push({
-      jobName: activePrintJob.jobName,
-      spoolId: spoolData.spoolId,
-      gramsUsed: spoolData.gramsUsed,
-      date: new Date().toISOString()
-    });
+    return {
+      ...spoolData,
+      endWeight,
+      gramsUsed,
+      used: gramsUsed,  // for consistency with other parts of your code
+    };
   });
+
+  // Add job usage record to history
+  history.push({
+    jobId: activePrintJob.jobId,
+    jobName: activePrintJob.jobName,
+    spools: updatedSpools,
+    startTime: activePrintJob.startTime,
+    endTime: new Date().toISOString()
+  });
+
+  // Save updated data and clear active job
+  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
+  localStorage.setItem("usageHistory", JSON.stringify(history));
+  localStorage.removeItem("activePrintJob");
+  activePrintJob = null;
+
+  alert("Print job ended and usage recorded.");
+  showScreen("home");
+  renderHistory();  // refresh history screen in case user navigates there
+}
 
   // Save updates
   localStorage.setItem("spoolLibrary", JSON.stringify(spools));
@@ -492,22 +511,7 @@ window.addEventListener("load", () => {
   }
 });
 
-function saveEndPrintJob() {
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
-  const endTime = new Date().toISOString();
-  const updatedSpools = activePrintJob.spools.map(spool => {
-    const endWeight = parseFloat(document.getElementById(`endWeight_${spool.spoolId}`).value);
-    if (isNaN(endWeight)) {
-      alert("Please enter all end weights.");
-      throw new Error("Missing end weights");
-    }
-    return {
-      ...spool,
-      endWeight,
-      used: spool.startWeight - endWeight
-    };
-  });
 
   history.push({
     jobId: activePrintJob.jobId,
