@@ -511,3 +511,5 @@ function highlightSpool(spoolId) {
     }, 3000);
   }
 }
+
+window.showScreen = showScreen;
