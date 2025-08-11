@@ -179,8 +179,8 @@ function renderHistory() {
 
   history.forEach(job => {
     const li = document.createElement("li");
-    let spoolDetails = job.spools.map(s =>
-      `${s.spoolLabel}: ${s.used.toFixed(2)} g used`
+    let spoolDetails = job.spools.map((s, i) =>
+      `<a href="#" class="spool-link" data-spool-index="${s.spoolId}">${s.spoolLabel}</a>: ${s.used.toFixed(2)} g used`
     ).join("<br>");
     li.innerHTML = `
       <strong>${job.jobName}</strong> 
@@ -188,6 +188,16 @@ function renderHistory() {
       <br>${spoolDetails}
     `;
     list.appendChild(li);
+  });
+
+  // Add click handlers to all spool links
+  document.querySelectorAll('.spool-link').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const spoolIndex = e.target.getAttribute('data-spool-index');
+      showScreen('library');
+      highlightSpool(spoolIndex);
+    });
   });
 }
 
