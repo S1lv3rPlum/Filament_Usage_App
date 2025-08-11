@@ -422,8 +422,8 @@ function showEndPrintSection() {
 }
 
 function endPrintJob() {
-  const spools = JSON.parse(localStorage.getItem("spools")) || [];
-  const history = JSON.parse(localStorage.getItem("history")) || [];
+  const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
+  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
   activePrintJob.spools.forEach(spoolData => {
     const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
@@ -450,8 +450,8 @@ function endPrintJob() {
   });
 
   // Save updates
-  localStorage.setItem("spools", JSON.stringify(spools));
-  localStorage.setItem("history", JSON.stringify(history));
+  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
+  localStorage.setItem("usageHistory", JSON.stringify(history));
   localStorage.removeItem("activePrintJob");
 
   activePrintJob = null;
