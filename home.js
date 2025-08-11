@@ -173,18 +173,20 @@ function renderLibrary() {
 
 // ----- Render History -----
 function renderHistory() {
+  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
   const list = document.getElementById("historyList");
   list.innerHTML = "";
 
-  if (usageHistory.length === 0) {
-    list.innerHTML = "<li>No usage recorded</li>";
-    return;
-  }
-
-  usageHistory.forEach(entry => {
+  history.forEach(job => {
     const li = document.createElement("li");
-    const dateStr = new Date(entry.date).toLocaleString();
-    li.textContent = `${dateStr} - ${entry.lengthUsed}m used from ${entry.spoolBrand}`;
+    let spoolDetails = job.spools.map(s =>
+      `${s.spoolLabel}: ${s.used.toFixed(2)} g used`
+    ).join("<br>");
+    li.innerHTML = `
+      <strong>${job.jobName}</strong> 
+      <small>(${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()})</small>
+      <br>${spoolDetails}
+    `;
     list.appendChild(li);
   });
 }
