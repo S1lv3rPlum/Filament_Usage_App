@@ -42,6 +42,70 @@ function showScreen(id) {
   }
 }
 
+function renderAnalytics() {
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  const materialUsage = {};
+
+  // Aggregate total grams used per material
+  usageHistory.forEach(job => {
+    job.spools.forEach(spool => {
+      const material = spool.spoolLabel.match(/\(([^)]+)\)/)?.[1] || "Unknown"; // Extract material from label
+      const used = spool.used || 0;
+      materialUsage[material] = (materialUsage[material] || 0) + used;
+    });
+  });
+
+  const labels = Object.keys(materialUsage);
+  const data = labels.map(label => materialUsage[label]);
+
+  const ctx = document.getElementById("usageChart").getContext("2d");
+
+  // Clear previous chart if exists
+  if (window.usageChartInstance) {
+    window.usageChartInstance.destroy();
+  }
+
+  window.usageChartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Filament Used (grams)",
+        data,
+        backgroundColor: "rgba(0, 122, 204, 0.7)",
+        borderColor: "rgba(0, 122, 204, 1)",
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "Grams Used"
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: "Material"
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top"
+        },
+        tooltip: {
+          enabled: true
+        }
+      }
+    }
+  });
+}
+
 // ----- Material Dropdown -----
 function populateMaterialDropdown() {
   const select = document.getElementById("materialSelect");
