@@ -613,5 +613,41 @@ function renderHistory() {
   populateSpoolFilterDropdown();
   renderHistoryFiltered();
 }
+
+// Setup live filtering
+function setupLiveFilters() {
+  const startDateInput = document.getElementById("filterStartDate");
+  const endDateInput = document.getElementById("filterEndDate");
+  const spoolSelect = document.getElementById("filterSpool");
+  const clearBtn = document.getElementById("clearFiltersBtn");
+
+  function updateFilters() {
+    const startDate = startDateInput.value;
+    const endDate = endDateInput.value;
+    const spoolLabel = spoolSelect.value;
+    renderHistoryFiltered(startDate, endDate, spoolLabel);
+  }
+
+  startDateInput.addEventListener("change", updateFilters);
+  endDateInput.addEventListener("change", updateFilters);
+  spoolSelect.addEventListener("change", updateFilters);
+
+  clearBtn.addEventListener("click", () => {
+    startDateInput.value = "";
+    endDateInput.value = "";
+    spoolSelect.value = "";
+    renderHistoryFiltered();
+  });
+}
+
+// Override renderHistory to setup dropdown and live filters
+function renderHistory() {
+  populateSpoolFilterDropdown();
+  renderHistoryFiltered();
+  setupLiveFilters();
+}
+
+
+
 window.showScreen = showScreen;
 
