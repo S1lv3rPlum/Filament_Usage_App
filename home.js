@@ -1,3 +1,6 @@
+console.log("JS Loaded, showScreen is:", typeof showScreen);
+window.showScreen = showScreen;
+
 // ----- Data Storage -----
 let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
 let usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
