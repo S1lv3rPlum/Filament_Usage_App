@@ -13,18 +13,20 @@ let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
   "Custom"
 ];
 
+let activePrintJob = null; // Will hold current job data
+
 // ----- Screen Navigation -----
 function showScreen(id) {
   document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 
-  // if (id === "library") renderLibrary();
- //  if (id === "history") renderHistory();
+  if (id === "library") renderLibrary();
+  if (id === "history") renderHistory();
 
- // if (id === "tracking") {
- //   populateSpoolMultiSelect();
+  if (id === "tracking") {
+    populateSpoolMultiSelect();
 
- //   if (activePrintJob) {
+    if (activePrintJob) {
       document.getElementById("startPrintSection").classList.add("hidden");
       document.getElementById("endPrintSection").classList.remove("hidden");
       document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
@@ -118,7 +120,7 @@ function saveSpool() {
 
 // ----- Populate Spool Select in Tracking -----
 function populateSpoolSelect() {
-  const select = document.getElementById("selectSpools");  // FIXED ID here
+  const select = document.getElementById("selectSpools");
   select.innerHTML = ""; // Clear existing options
 
   // Add the default placeholder option
@@ -189,8 +191,13 @@ function renderLibrary() {
 // ----- Render History -----
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
-  const list = document.getElementById("historyList");  // Ensure this element exists in HTML
+  const list = document.getElementById("historyList");
   list.innerHTML = "";
+
+  if (history.length === 0) {
+    list.innerHTML = "<li>No usage history available</li>";
+    return;
+  }
 
   history.forEach(job => {
     const li = document.createElement("li");
@@ -229,13 +236,24 @@ function renderAnalytics() {
   // Aggregate usage by material
   const usageByMaterial = {};
   usageHistory.forEach(usage => {
-    usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + usage.lengthUsed;
+    if (usage.spoolMaterial) {
+      usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + (usage.lengthUsed || 0);
+    }
   });
 
   const labels = Object.keys(usageByMaterial);
   const data = Object.values(usageByMaterial);
 
-  // Destroy existing chart instance if exists to prevent overlap (optional, requires storing chart globally)
+  // If no data, show message
+  if (labels.length === 0) {
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#666";
+    ctx.textAlign = "center";
+    ctx.fillText("No usage data available", canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  // Destroy existing chart instance if exists to prevent overlap
   if (window.usageChartInstance) {
     window.usageChartInstance.destroy();
   }
@@ -327,8 +345,6 @@ document.addEventListener("DOMContentLoaded", () => {
   showScreen("home");
   populateMaterialDropdown();
 });
-
-let activePrintJob = null; // Will hold current job data
 
 function populateSpoolMultiSelect() {
   const select = document.getElementById("selectSpools");
@@ -441,25 +457,6 @@ function endPrintJob() {
 
   alert("Print job ended and usage recorded.");
   showScreen("home");
-  renderHistory();
-}
-
-  history.push({
-    jobId: activePrintJob.jobId,
-    jobName: activePrintJob.jobName,
-    spools: updatedSpools,
-    startTime: activePrintJob.startTime,
-    endTime: new Date().toISOString()
-  });
-
-  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
-  localStorage.setItem("usageHistory", JSON.stringify(history));
-  localStorage.removeItem("activePrintJob");
-  activePrintJob = null;
-
-  alert("Print job ended and usage recorded.");
-  showScreen("home");
-  renderHistory();
 }
 
 function cancelActiveJob() {
@@ -471,8 +468,10 @@ function cancelActiveJob() {
 }
 
 // UI helper to show start weights when spools selected
-document.getElementById("selectSpools").addEventListener("change", () => {
+document.getElementById("selectSpools")?.addEventListener("change", () => {
   const container = document.getElementById("startWeightsContainer");
+  if (!container) return;
+  
   container.innerHTML = "";
   const selected = Array.from(document.getElementById("selectSpools").selectedOptions);
   selected.forEach(opt => {
@@ -487,7 +486,6 @@ document.getElementById("selectSpools").addEventListener("change", () => {
 
 // Restore job if page reloads
 window.addEventListener("load", () => {
-  populateSpoolMultiSelect();
   const savedJob = JSON.parse(localStorage.getItem("activePrintJob"));
   if (savedJob) {
     activePrintJob = savedJob;
