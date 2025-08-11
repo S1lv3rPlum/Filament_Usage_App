@@ -122,3 +122,7 @@ input {
   user-select: none;
   z-index: 1000;
 }
+
+.hidden {
+  display: block !important; /* to force visibility */
+}
