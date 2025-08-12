@@ -624,3 +624,72 @@ function renderAnalytics() {
     }
   });
 }
+
+let historyDisplayCount = 10; // how many entries to show
+let historyPage = 0; // current page (0 = newest 10)
+
+function renderHistory() {
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  usageHistory.sort((a, b) => new Date(b.startTime) - new Date(a.startTime)); // newest first
+
+  const start = historyPage * historyDisplayCount;
+  const end = start + historyDisplayCount;
+  const slice = usageHistory.slice(start, end);
+
+  const list = document.getElementById("historyList");
+  list.innerHTML = "";
+
+  if (slice.length === 0) {
+    list.innerHTML = "<li>No print jobs found.</li>";
+    return;
+  }
+
+  slice.forEach(job => {
+    // Sum grams per material in this job
+    const materialTotals = {};
+    job.spools.forEach(spool => {
+      const material = spool.spoolLabel.match(/\(([^)]+)\)/)?.[1] || "Unknown";
+      materialTotals[material] = (materialTotals[material] || 0) + (spool.used || 0);
+    });
+
+    const materialsUsed = Object.entries(materialTotals)
+      .map(([mat, grams]) => `${mat}: ${grams.toFixed(2)} g`)
+      .join(", ");
+
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <strong>${job.jobName}</strong><br/>
+      <small>${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()}</small><br/>
+      Materials used: ${materialsUsed}
+    `;
+    list.appendChild(li);
+  });
+
+  // Show or hide Load More button
+  const loadMoreBtn = document.getElementById("loadMoreHistoryBtn");
+  if (!loadMoreBtn) {
+    const btn = document.createElement("button");
+    btn.id = "loadMoreHistoryBtn";
+    btn.textContent = "Load More";
+    btn.style.marginTop = "10px";
+    btn.onclick = () => {
+      historyPage++;
+      renderHistory();
+    };
+    list.parentNode.appendChild(btn);
+  }
+
+  // Hide Load More button if no more history
+  if (end >= usageHistory.length) {
+    const btn = document.getElementById("loadMoreHistoryBtn");
+    if (btn) btn.style.display = "none";
+  } else {
+    const btn = document.getElementById("loadMoreHistoryBtn");
+    if (btn) btn.style.display = "inline-block";
+  }
+}
+
+// Reset pagination on showScreen("history")
+function resetHistoryPagination() {
+  historyPage = 0;
+}
