@@ -15,13 +15,17 @@ let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
 
 let activePrintJob = JSON.parse(localStorage.getItem("activePrintJob")) || null;
 
-// ----- Screen Navigation -----
+
+//navigation
 function showScreen(id) {
   document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 
   if (id === "library") Library();
-  else if (id === "history") History();
+  else if (id === "history") {
+    resetHistoryPagination();
+    History();
+  }
   else if (id === "tracking") {
     populateSpoolMultiSelect();
 
