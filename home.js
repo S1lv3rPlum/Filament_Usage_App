@@ -584,41 +584,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 function renderAnalytics() {
-  console.log("renderAnalytics called");
-  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
-  const materialUsage = {};
-
-  usageHistory.forEach(job => {
-    job.spools.forEach(spool => {
-      const material = spool.spoolLabel.match(/\(([^)]+)\)/)?.[1] || "Unknown";
-      const used = spool.used || 0;
-      materialUsage[material] = (materialUsage[material] || 0) + used;
-    });
-  });
-
-  const labels = Object.keys(materialUsage);
-  const data = labels.map(label => materialUsage[label]);
-  console.log("Labels:", labels, "Data:", data);
-
-  if (labels.length === 0) {
-    console.warn("No usage data to display");
-  }
-
   const ctx = document.getElementById("usageChart").getContext("2d");
 
+  // Destroy existing chart instance if present
   if (window.usageChartInstance) {
     window.usageChartInstance.destroy();
   }
 
+  // Dummy data example
+  const labels = ['PLA', 'ABS', 'PETG', 'Nylon', 'TPU'];
+  const data = [120, 80, 45, 60, 30];
+
   window.usageChartInstance = new Chart(ctx, {
-    type: "bar",
+    type: 'bar',
     data: {
       labels,
       datasets: [{
-        label: "Filament Used (grams)",
+        label: 'Filament Used (grams)',
         data,
-        backgroundColor: "rgba(0, 122, 204, 0.7)",
-        borderColor: "rgba(0, 122, 204, 1)",
+        backgroundColor: 'rgba(0, 122, 204, 0.7)',
+        borderColor: 'rgba(0, 122, 204, 1)',
         borderWidth: 1,
       }]
     },
@@ -626,14 +611,14 @@ function renderAnalytics() {
       scales: {
         y: {
           beginAtZero: true,
-          title: { display: true, text: "Grams Used" }
+          title: { display: true, text: 'Grams Used' }
         },
         x: {
-          title: { display: true, text: "Material" }
+          title: { display: true, text: 'Material' }
         }
       },
       plugins: {
-        legend: { display: true, position: "top" },
+        legend: { display: true, position: 'top' },
         tooltip: { enabled: true }
       }
     }
