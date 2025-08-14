@@ -640,41 +640,49 @@ let historyDisplayCount = 10; // how many entries to show
 let historyPage = 0; // current page (0 = newest 10)
 
 function renderHistory() {
-  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
-  usageHistory.sort((a, b) => new Date(b.startTime) - new Date(a.startTime)); // newest first
+  const historyList = document.getElementById("historyList");
+  historyList.innerHTML = "";
 
-  const start = historyPage * historyDisplayCount;
-  const end = start + historyDisplayCount;
-  const slice = usageHistory.slice(start, end);
+  let history = JSON.parse(localStorage.getItem("history")) || [];
 
-  const list = document.getElementById("historyList");
-  list.innerHTML = "";
+  // Sort most recent first
+  history.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  if (slice.length === 0) {
-    list.innerHTML = "<li>No print jobs found.</li>";
-    return;
+  // Apply filters if any are set
+  const startDate = document.getElementById("filterStartDate").value;
+  const endDate = document.getElementById("filterEndDate").value;
+  const filterSpool = document.getElementById("filterSpool").value;
+
+  if (startDate || endDate || filterSpool) {
+    history = history.filter(entry => {
+      const entryDate = new Date(entry.date);
+      let match = true;
+
+      if (startDate) match = match && entryDate >= new Date(startDate);
+      if (endDate) match = match && entryDate <= new Date(endDate);
+      if (filterSpool) match = match && entry.spoolId === filterSpool;
+
+      return match;
+    });
+  } else {
+    // No filters → show only last 10 entries
+    history = history.slice(0, 10);
   }
 
-  slice.forEach(job => {
-    // Sum grams per material in this job
-    const materialTotals = {};
-    job.spools.forEach(spool => {
-      const material = spool.spoolLabel.match(/\(([^)]+)\)/)?.[1] || "Unknown";
-      materialTotals[material] = (materialTotals[material] || 0) + (spool.used || 0);
+  // Render list
+  if (history.length === 0) {
+    historyList.innerHTML = "<li>No history records found.</li>";
+  } else {
+    history.forEach(entry => {
+      const li = document.createElement("li");
+      li.textContent = `${entry.date} — ${entry.jobName || "Unnamed Job"} — ${entry.materialUsed}g`;
+      historyList.appendChild(li);
     });
+  }
 
-    const materialsUsed = Object.entries(materialTotals)
-      .map(([mat, grams]) => `${mat}: ${grams.toFixed(2)} g`)
-      .join(", ");
-
-    const li = document.createElement("li");
-    li.innerHTML = `
-      <strong>${job.jobName}</strong><br/>
-      <small>${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()}</small><br/>
-      Materials used: ${materialsUsed}
-    `;
-    list.appendChild(li);
-  });
+  // Populate filter spool dropdown if needed
+  populateHistorySpoolDropdown();
+}
 
   // Show or hide Load More button
   const loadMoreBtn = document.getElementById("loadMoreHistoryBtn");
