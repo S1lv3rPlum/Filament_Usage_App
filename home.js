@@ -1,3 +1,7 @@
+// TEMPORARY: Clear old incompatible history data
+localStorage.removeItem("usageHistory");
+
+
 console.log("JS Loaded, showScreen is:", typeof showScreen);
 window.showScreen = showScreen;
 
