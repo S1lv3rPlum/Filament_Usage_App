@@ -1,40 +1,58 @@
-// ----- Global showScreen ----- console.log("JS Loaded, showScreen is:", typeof showScreen); window.showScreen = showScreen;
+function showScreen(id) {
+  document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
 
-// ----- Data Storage ----- let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || []; let usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || []; let materialsList = JSON.parse(localStorage.getItem("materialsList")) || ["PLA","ABS","PETG","Nylon","TPU","Custom"]; let activePrintJob = JSON.parse(localStorage.getItem("activePrintJob")) || null;
+  if (id === "library") renderLibrary();
+  if (id === "history") renderHistory();
+  if (id === "tracking") populateSpoolMultiSelect();
+  if (id === "addSpool") populateMaterialDropdown();
+  if (id === "analytics") renderAnalytics();
+  if (id === "settings") {
+    // settings setup if needed
+  }
+}
 
-// ----- Navigation ----- function showScreen(id) { document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden")); document.getElementById(id).classList.remove("hidden");
+function renderHistory() {
+  const historyList = document.getElementById("historyList");
+  historyList.innerHTML = "";
 
-if (id === "library") Library(); else if (id === "history") { resetHistoryPagination(); renderHistory(); } else if (id === "tracking") { populateSpoolMultiSelect(); if (activePrintJob) { document.getElementById("startPrintSection").classList.add("hidden"); document.getElementById("endPrintSection").classList.remove("hidden"); document.getElementById("activeJobName").textContent = Active Job: ${activePrintJob.jobName}; } else { document.getElementById("startPrintSection").classList.remove("hidden"); document.getElementById("endPrintSection").classList.add("hidden"); } } else if (id === "addSpool") { populateMaterialDropdown(); } else if (id === "analytics") { Analytics(); } }
+  const startDate = document.getElementById("filterStartDate").value;
+  const endDate = document.getElementById("filterEndDate").value;
+  const spoolFilter = document.getElementById("filterSpool").value;
 
-// ----- History Pagination and Display ----- let historyDisplayCount = 10; // number of entries per page let historyPage = 0; // current page (0 = newest 10)
+  let filtered = usageHistory;
 
-function resetHistoryPagination() { historyPage = 0; }
+  if (startDate) {
+    filtered = filtered.filter(item => new Date(item.date) >= new Date(startDate));
+  }
+  if (endDate) {
+    filtered = filtered.filter(item => new Date(item.date) <= new Date(endDate));
+  }
+  if (spoolFilter) {
+    filtered = filtered.filter(item => item.spoolId === spoolFilter);
+  }
 
-function renderHistory() { const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || []; usageHistory.sort((a, b) => new Date(b.startTime) - new Date(a.startTime)); // newest first
+  // If no filters, show the last 10 by default
+  if (!startDate && !endDate && !spoolFilter) {
+    filtered = [...usageHistory]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 10);
+  } else {
+    filtered = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
 
-const start = historyPage * historyDisplayCount; const end = start + historyDisplayCount; const slice = usageHistory.slice(start, end);
+  filtered.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = `${item.date}: ${item.jobName || "Unnamed Job"} — ${item.materialUsed}g`;
+    historyList.appendChild(li);
+  });
+}
 
-const list = document.getElementById("historyList"); list.innerHTML = "";
-
-if (slice.length === 0) { list.innerHTML = "<li>No print jobs found.</li>"; return; }
-
-slice.forEach(job => { const materialTotals = {}; job.spools.forEach(spool => { const material = spool.spoolLabel.match(//)?.[1] || "Unknown"; materialTotals[material] = (materialTotals[material] || 0) + (spool.used || 0); });
-
-const materialsUsed = Object.entries(materialTotals)
-  .map(([mat, grams]) => `${mat}: ${grams.toFixed(2)} g`)
-  .join(", ");
-
-const li = document.createElement("li");
-li.innerHTML = `
-  <strong>${job.jobName}</strong><br/>
-  <small>${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()}</small><br/>
-  Materials used: ${materialsUsed}
-`;
-list.appendChild(li);
-
+// Event listeners for filter buttons
+document.getElementById("filterButton").addEventListener("click", renderHistory);
+document.getElementById("clearFilterButton").addEventListener("click", () => {
+  document.getElementById("filterStartDate").value = "";
+  document.getElementById("filterEndDate").value = "";
+  document.getElementById("filterSpool").value = "";
+  renderHistory();
 });
-
-// Load More button const loadMoreBtn = document.getElementById("loadMoreHistoryBtn"); if (!loadMoreBtn) { const btn = document.createElement("button"); btn.id = "loadMoreHistoryBtn"; btn.textContent = "Load More"; btn.style.marginTop = "10px"; btn.onclick = () => { historyPage++; renderHistory(); }; list.parentNode.appendChild(btn); }
-
-if (end >= usageHistory.length) { if (loadMoreBtn) loadMoreBtn.style.display = "none"; } else { if (loadMoreBtn) loadMoreBtn.style.display = "inline-block"; } }
-
