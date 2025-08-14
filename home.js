@@ -454,31 +454,44 @@ function showEndPrintSection() {
   });
 }
 
-function endPrintJob() {
-  const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
+function endPrintJob(jobId) {
+  let jobs = JSON.parse(localStorage.getItem("printJobs")) || [];
+  let usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  let spoolsList = JSON.parse(localStorage.getItem("spools")) || [];
 
-  const updatedSpools = activePrintJob.spools.map(spoolData => {
-    const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
-    if (isNaN(endWeight)) {
-      alert("Please enter all end weights.");
-      throw new Error("Missing end weights");
-    }
-    const gramsUsed = spoolData.startWeight - endWeight;
+  let jobIndex = jobs.findIndex(j => j.jobId === jobId);
+  if (jobIndex === -1) return;
 
-    // Find the correct spool index in the current spools array
-    const spoolIndex = parseInt(spoolData.spoolId, 10);
-    if (spoolIndex !== -1) {
-      spools[spoolIndex].weight = endWeight;  // update weight
-    }
+  let job = jobs[jobIndex];
+  job.endTime = new Date().toISOString();
 
-    return {
-      ...spoolData,
-      endWeight,
-      gramsUsed,
-      used: gramsUsed,
-    };
-  });
+  // Add spoolMaterial to each spool entry
+  if (Array.isArray(job.spools)) {
+    job.spools = job.spools.map(spoolEntry => {
+      let spoolInfo = spoolsList.find(s => s.id === spoolEntry.spoolId);
+      let material = spoolInfo?.material ||
+        spoolEntry.spoolMaterial ||
+        (spoolEntry.spoolLabel?.match(/\(([^)]+)\)/)?.[1] || "Unknown");
+
+      return {
+        ...spoolEntry,
+        spoolMaterial: material
+      };
+    });
+  }
+
+  // Move job to usage history
+  usageHistory.push(job);
+  localStorage.setItem("usageHistory", JSON.stringify(usageHistory));
+
+  // Remove from active jobs
+  jobs.splice(jobIndex, 1);
+  localStorage.setItem("printJobs", JSON.stringify(jobs));
+
+  renderJobs();
+  renderHistoryFiltered();
+  renderAnalytics();
+}
 
   // Save updated spools and history
   localStorage.setItem("spoolLibrary", JSON.stringify(spools));
