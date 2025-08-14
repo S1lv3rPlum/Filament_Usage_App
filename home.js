@@ -13,19 +13,23 @@ let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
   "Custom"
 ];
 
-let activePrintJob = JSON.parse(localStorage.getItem("activePrintJob")) || null;
+let activePrintJob = null; // Will hold current job data
+let historyDisplayCount = 10; // how many entries to show
+let historyPage = 0; // current page (0 = newest 10)
+
 
 // ----- Screen Navigation -----
 function showScreen(id) {
   document.querySelectorAll("main, section").forEach(s => s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 
-  if (id === "library") Library();
-  else if (id === "history") {
-    resetHistoryPagination();
-    History(); // This will default to last 10
-  }
-  else if (id === "tracking") {
+  if (id === "library") renderLibrary();
+  if (id === "history") {
+  resetHistoryPagination();
+  renderHistory();
+}
+
+  if (id === "tracking") {
     populateSpoolMultiSelect();
 
     if (activePrintJob) {
@@ -36,78 +40,13 @@ function showScreen(id) {
       document.getElementById("startPrintSection").classList.remove("hidden");
       document.getElementById("endPrintSection").classList.add("hidden");
     }
-  } else if (id === "addSpool") {
-    populateMaterialDropdown();
-  } else if (id === "analytics") {
-    Analytics();
-  } else if (id === "settings") {
+  }
+
+  if (id === "addSpool") populateMaterialDropdown();
+  if (id === "analytics") renderAnalytics();
+  if (id === "settings") {
     // Setup for settings if needed
   }
-}
-
-// ====== Analytics (existing) ======
-function Analytics() {
-  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
-  const materialUsage = {};
-
-  // Aggregate total grams used per material
-  usageHistory.forEach(job => {
-    job.spools.forEach(spool => {
-      const material = spool.spoolLabel.match(/\(([^)]+)\)/)?.[1] || "Unknown"; // Extract material from label
-      const used = spool.used || 0;
-      materialUsage[material] = (materialUsage[material] || 0) + used;
-    });
-  });
-
-  const labels = Object.keys(materialUsage);
-  const data = labels.map(label => materialUsage[label]);
-
-  const ctx = document.getElementById("usageChart").getContext("2d");
-
-  // Clear previous chart if exists
-  if (window.usageChartInstance) {
-    window.usageChartInstance.destroy();
-  }
-
-  window.usageChartInstance = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "Filament Used (grams)",
-        data,
-        backgroundColor: "rgba(0, 122, 204, 0.7)",
-        borderColor: "rgba(0, 122, 204, 1)",
-        borderWidth: 1,
-      }]
-    },
-    options: {
-      scales: {
-        y: {
-          beginAtZero: true,
-          title: {
-            display: true,
-            text: "Grams Used"
-          }
-        },
-        x: {
-          title: {
-            display: true,
-            text: "Material"
-          }
-        }
-      },
-      plugins: {
-        legend: {
-          display: true,
-          position: "top"
-        },
-        tooltip: {
-          enabled: true
-        }
-      }
-    }
-  });
 }
 
 // ----- Material Dropdown -----
@@ -143,8 +82,11 @@ function saveSpool() {
   const brand = document.getElementById("brand").value.trim();
   const color = document.getElementById("color").value.trim();
 
-  let material = document.getElementById("materialSelect").value;
-  const customMaterial = document.getElementById("customMaterialInput").value.trim();
+  const materialSelect = document.getElementById("materialSelect");
+  let material = materialSelect.value;
+
+  const customMaterialInput = document.getElementById("customMaterialInput");
+  const customMaterial = customMaterialInput.value.trim();
 
   if (material === "Custom") {
     if (!customMaterial) {
@@ -153,8 +95,9 @@ function saveSpool() {
     }
     material = customMaterial;
 
+    // Add new custom material if not already present
     if (!materialsList.includes(material)) {
-      materialsList.splice(materialsList.length - 1, 0, material); // insert before "Custom"
+      materialsList.splice(materialsList.length - 1, 0, material); // before "Custom"
       localStorage.setItem("materialsList", JSON.stringify(materialsList));
     }
   }
@@ -163,7 +106,7 @@ function saveSpool() {
   const weight = parseFloat(document.getElementById("weight").value);
 
   if (!brand || !color || !material || isNaN(length) || isNaN(weight)) {
-    alert("Please fill out all fields correctly.");
+    alert("Please fill out all fields.");
     return;
   }
 
@@ -184,18 +127,20 @@ function saveSpool() {
 // ----- Populate Spool Select in Tracking -----
 function populateSpoolSelect() {
   const select = document.getElementById("selectSpools");
-  select.innerHTML = "";
+  select.innerHTML = ""; // Clear existing options
 
+  // Add the default placeholder option
   const defaultOption = document.createElement("option");
-  defaultOption.value = "";
+  defaultOption.value = "";           // empty value means no spool selected
   defaultOption.textContent = "~select a spool~";
-  defaultOption.disabled = true;
-  defaultOption.selected = true;
+  defaultOption.disabled = true;      // user cannot select it once another option is chosen
+  defaultOption.selected = true;      // this option is selected by default
   select.appendChild(defaultOption);
 
+  // Add the spools from the library
   spoolLibrary.forEach((spool, index) => {
     const option = document.createElement("option");
-    option.value = index;
+    option.value = index;              // use index as value
     option.textContent = `${spool.brand} - ${spool.color} - ${spool.material}`;
     select.appendChild(option);
   });
@@ -233,8 +178,8 @@ function saveUsage() {
   showScreen("home");
 }
 
-// -----  Library -----
-function Library() {
+// ----- Render Library -----
+function renderLibrary() {
   const list = document.getElementById("spoolList");
   list.innerHTML = "";
   if (spoolLibrary.length === 0) {
@@ -243,181 +188,20 @@ function Library() {
   }
   spoolLibrary.forEach((spool, index) => {
     const li = document.createElement("li");
-    li.setAttribute('data-spool-id', index.toString());
+    li.setAttribute('data-spool-id', index.toString());  // Set data attribute for id
     li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${spool.length}m, ${spool.weight}g)`;
     list.appendChild(li);
   });
 }
 
-// ----- Populate spool multi-select (tracking) -----
-function populateSpoolMultiSelect() {
-  const select = document.getElementById("selectSpools");
-  select.innerHTML = "";
-  spoolLibrary.forEach((spool, index) => {
-    const option = document.createElement("option");
-    option.value = index; // use index as value (matches rest of your code)
-    option.textContent = `${spool.brand} - ${spool.color} (${spool.material}) (${spool.weight}g)`;
-    select.appendChild(option);
-  });
+// ----- Render History with Filtering -----
+function renderHistory() {
+  populateHistorySpoolDropdown();
+  renderHistoryFiltered(true); // show last 10 by default
+  setupLiveFilters();
 }
 
-// ----- Start Print Job -----
-function startPrintJob() {
-  const jobName = document.getElementById("jobName").value.trim();
-  const selectedOptions = Array.from(document.getElementById("selectSpools").selectedOptions);
-  const allSpools = spoolLibrary;
-
-  if (selectedOptions.length === 0) {
-    alert("Please select at least one spool.");
-    return;
-  }
-
-  const spools = selectedOptions.map(opt => {
-    const spoolInfo = allSpools[opt.value] || {};
-    const startWeight = spoolInfo.weight;
-
-    if (typeof startWeight !== "number" || isNaN(startWeight)) {
-      alert("Spool weight data missing or invalid.");
-      throw new Error("Invalid start weight");
-    }
-
-    const label = `${spoolInfo.brand || "Unknown"} - ${spoolInfo.color || "?"} (${spoolInfo.material || "?"}) (${startWeight}g)`;
-
-    return {
-      spoolId: opt.value,
-      spoolLabel: label,
-      startWeight
-    };
-  });
-
-  activePrintJob = {
-    jobId: Date.now(),
-    jobName: jobName || `Print ${new Date().toLocaleString()}`,
-    spools,
-    startTime: new Date().toISOString(),
-  };
-
-  localStorage.setItem("activePrintJob", JSON.stringify(activePrintJob));
-  showEndPrintSection();
-}
-
-// ----- Show End Print Section -----
-function showEndPrintSection() {
-  document.getElementById("startPrintSection").classList.add("hidden");
-  document.getElementById("endPrintSection").classList.remove("hidden");
-  document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
-
-  const container = document.getElementById("endWeightsContainer");
-  container.innerHTML = "";
-  activePrintJob.spools.forEach(spool => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <label>${spool.spoolLabel} End Weight (g):</label>
-      <input type="number" id="endWeight_${spool.spoolId}" step="0.01" />
-    `;
-    container.appendChild(div);
-  });
-}
-
-// ----- End Print Job -----
-function endPrintJob() {
-  const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
-
-  const updatedSpools = activePrintJob.spools.map(spoolData => {
-    const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
-    if (isNaN(endWeight)) {
-      alert("Please enter all end weights.");
-      throw new Error("Missing end weights");
-    }
-    const gramsUsed = spoolData.startWeight - endWeight;
-
-    const spoolIndex = parseInt(spoolData.spoolId, 10);
-    if (spoolIndex !== -1) {
-      spools[spoolIndex].weight = endWeight;  // update weight
-    }
-
-    return {
-      ...spoolData,
-      endWeight,
-      gramsUsed,
-      used: gramsUsed,
-    };
-  });
-
-  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
-
-  history.push({
-    jobId: activePrintJob.jobId,
-    jobName: activePrintJob.jobName,
-    spools: updatedSpools,
-    startTime: activePrintJob.startTime,
-    endTime: new Date().toISOString()
-  });
-
-  localStorage.setItem("usageHistory", JSON.stringify(history));
-  localStorage.removeItem("activePrintJob");
-  activePrintJob = null;
-
-  alert("Print job ended and usage recorded.");
-  showScreen("home");
-}
-
-// ----- Cancel Active Job -----
-function cancelActiveJob() {
-  if (confirm("Cancel the active print job? Progress will be lost.")) {
-    localStorage.removeItem("activePrintJob");
-    activePrintJob = null;
-    showScreen("home");
-  }
-}
-
-// ----- Highlight Spool in Library -----
-function highlightSpool(spoolId) {
-  const spoolList = document.getElementById('spoolList');
-  const items = spoolList.querySelectorAll('li');
-
-  // Clear previous highlights
-  items.forEach(item => item.style.backgroundColor = '');
-
-  const targetItem = [...items].find(li => li.getAttribute('data-spool-id') === spoolId.toString());
-
-  if (targetItem) {
-    targetItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    targetItem.style.backgroundColor = 'yellow';
-
-    setTimeout(() => {
-      targetItem.style.backgroundColor = '';
-    }, 3000);
-  }
-}
-
-// ----- Populate Spool Filter Dropdown -----
-function populateSpoolFilterDropdown() {
-  const spoolSelect = document.getElementById("filterSpool");
-  if (!spoolSelect) return;
-
-  spoolSelect.innerHTML = '<option value="">All Spools</option>';
-
-  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
-  const uniqueLabels = new Set();
-
-  usageHistory.forEach(job => {
-    job.spools.forEach(spool => {
-      uniqueLabels.add(spool.spoolLabel);
-    });
-  });
-
-  [...uniqueLabels].sort().forEach(label => {
-    const option = document.createElement("option");
-    option.value = label;
-    option.textContent = label;
-    spoolSelect.appendChild(option);
-  });
-}
-
-// -----  History with Filters (NOW supports default last 10) -----
-function HistoryFiltered(defaultLastTen = false) {
+function renderHistoryFiltered(defaultLastTen = false) {
   const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
   const startDateVal = document.getElementById("filterStartDate")?.value || "";
@@ -478,44 +262,58 @@ function HistoryFiltered(defaultLastTen = false) {
   });
 }
 
-// ----- Apply and Clear Filters -----
-function applyFilters() {
-  HistoryFiltered(false);
-}
+// ----- Render Analytics -----
+function renderAnalytics() {
+  const canvas = document.getElementById('usageChart');
+  if (!canvas) return; // Canvas might not exist if section hidden
 
-function clearFilters() {
-  const s = document.getElementById("filterStartDate");
-  const e = document.getElementById("filterEndDate");
-  const f = document.getElementById("filterSpool");
-  if (s) s.value = "";
-  if (e) e.value = "";
-  if (f) f.value = "";
-  HistoryFiltered(true); // back to last 10
-}
+  const ctx = canvas.getContext('2d');
 
-// -----  History (initial) -----
-function History() {
-  populateSpoolFilterDropdown();
-  HistoryFiltered(true);   // show last 10 by default
-  setupLiveFilters();
-}
+  // Clear canvas for re-rendering (if you want to re-run multiple times)
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// ----- Setup Live Filters -----
-function setupLiveFilters() {
-  const startDateInput = document.getElementById("filterStartDate");
-  const endDateInput = document.getElementById("filterEndDate");
-  const spoolSelect = document.getElementById("filterSpool");
-  const filterBtn = document.getElementById("filterButton");
-  const clearBtn = document.getElementById("clearFilterButton"); // matches your HTML id
+  // Aggregate usage by material
+  const usageByMaterial = {};
+  usageHistory.forEach(usage => {
+    if (usage.spoolMaterial) {
+      usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + (usage.lengthUsed || 0);
+    }
+  });
 
-  const updateFilters = () => HistoryFiltered(false);
+  const labels = Object.keys(usageByMaterial);
+  const data = Object.values(usageByMaterial);
 
-  startDateInput?.addEventListener("change", updateFilters);
-  endDateInput?.addEventListener("change", updateFilters);
-  spoolSelect?.addEventListener("change", updateFilters);
+  // If no data, show message
+  if (labels.length === 0) {
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#666";
+    ctx.textAlign = "center";
+    ctx.fillText("No usage data available", canvas.width / 2, canvas.height / 2);
+    return;
+  }
 
-  filterBtn?.addEventListener("click", updateFilters);
-  clearBtn?.addEventListener("click", () => clearFilters());
+  // Destroy existing chart instance if exists to prevent overlap
+  if (window.usageChartInstance) {
+    window.usageChartInstance.destroy();
+  }
+
+  window.usageChartInstance = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Filament Used (m)',
+        data: data,
+        backgroundColor: [
+          '#007acc', '#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40'
+        ],
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+    }
+  });
 }
 
 // ----- Service Worker Update Handling -----
@@ -567,7 +365,7 @@ function showUpdatePrompt(onConfirm) {
   document.body.appendChild(prompt);
 }
 
-// ----- Initialize -----
+// ----- Setup check updates button -----
 document.addEventListener("DOMContentLoaded", () => {
   const checkUpdatesBtn = document.getElementById("checkUpdatesBtn");
   if (checkUpdatesBtn) {
@@ -582,137 +380,150 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Restore active job if exists
-  const savedJob = JSON.parse(localStorage.getItem("activePrintJob"));
-  if (savedJob) {
-    activePrintJob = savedJob;
-    showEndPrintSection();
-  } else {
-    showScreen("home");
-  }
-
+  // Initialize by showing home screen and populating material dropdown
+  showScreen("home");
   populateMaterialDropdown();
 });
 
-// (Optional older analytics function kept as-is; harmless if unused)
-function renderAnalytics() {
-  const ctx = document.getElementById("usageChart").getContext("2d");
-
-  if (window.usageChartInstance) {
-    window.usageChartInstance.destroy();
-  }
-
-  // Dummy example
-  const labels = ['PLA', 'ABS', 'PETG', 'Nylon', 'TPU'];
-  const data = [120, 80, 45, 60, 30];
-
-  window.usageChartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Filament Used (grams)',
-        data,
-        backgroundColor: 'rgba(0, 122, 204, 0.7)',
-        borderColor: 'rgba(0, 122, 204, 1)',
-        borderWidth: 1,
-      }]
-    },
-    options: {
-      scales: {
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'Grams Used' }
-        },
-        x: {
-          title: { display: true, text: 'Material' }
-        }
-      },
-      plugins: {
-        legend: { display: true, position: 'top' },
-        tooltip: { enabled: true }
-      }
-    }
+function populateSpoolMultiSelect() {
+  const select = document.getElementById("selectSpools");
+  select.innerHTML = "";
+  spoolLibrary.forEach((spool, index) => {
+    const option = document.createElement("option");
+    option.value = index;  // keep index as value
+    option.textContent = `${spool.brand} - ${spool.color} (${spool.material}) (${spool.weight}g)`;  // added weight here
+    select.appendChild(option);
   });
 }
 
-let historyDisplayCount = 10; // how many entries to show
-let historyPage = 0; // current page (0 = newest 10)
+function startPrintJob() {
+  const jobName = document.getElementById("jobName").value.trim();
+  const selectedOptions = Array.from(document.getElementById("selectSpools").selectedOptions);
+  const allSpools = spoolLibrary;
 
-function renderHistory() {
-  const historyList = document.getElementById("historyList");
-  historyList.innerHTML = "";
-
-  let history = JSON.parse(localStorage.getItem("history")) || [];
-
-  // Sort most recent first
-  history.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  // Apply filters if any are set
-  const startDate = document.getElementById("filterStartDate").value;
-  const endDate = document.getElementById("filterEndDate").value;
-  const filterSpool = document.getElementById("filterSpool").value;
-
-  if (startDate || endDate || filterSpool) {
-    history = history.filter(entry => {
-      const entryDate = new Date(entry.date);
-      let match = true;
-
-      if (startDate) match = match && entryDate >= new Date(startDate);
-      if (endDate) match = match && entryDate <= new Date(endDate);
-      if (filterSpool) match = match && entry.spoolId === filterSpool;
-
-      return match;
-    });
-  } else {
-    // No filters → show only last 10 entries
-    history = history.slice(0, 10);
+  if (selectedOptions.length === 0) {
+    alert("Please select at least one spool.");
+    return;
   }
 
-  // Render list
-  if (history.length === 0) {
-    historyList.innerHTML = "<li>No history records found.</li>";
-  } else {
-    history.forEach(entry => {
-      const li = document.createElement("li");
-      li.textContent = `${entry.date} — ${entry.jobName || "Unnamed Job"} — ${entry.materialUsed}g`;
-      historyList.appendChild(li);
-    });
-  }
+  const spools = selectedOptions.map(opt => {
+    // Use the current weight from spoolLibrary directly, no need to ask for start weight input
+    const spoolInfo = allSpools[opt.value] || {};
+    const startWeight = spoolInfo.weight;
+    if (typeof startWeight !== "number" || isNaN(startWeight)) {
+      alert("Spool weight data missing or invalid.");
+      throw new Error("Invalid start weight");
+    }
 
-  // Populate filter spool dropdown if needed
-  populateHistorySpoolDropdown();
-}
+    const label = `${spoolInfo.brand || "Unknown"} - ${spoolInfo.color || "?"} (${spoolInfo.material || "?"}) (${startWeight}g)`;
 
-  // Show or hide Load More button
-  const loadMoreBtn = document.getElementById("loadMoreHistoryBtn");
-  if (!loadMoreBtn) {
-    const btn = document.createElement("button");
-    btn.id = "loadMoreHistoryBtn";
-    btn.textContent = "Load More";
-    btn.style.marginTop = "10px";
-    btn.onclick = () => {
-      historyPage++;
-      renderHistory();
+    return {
+      spoolId: opt.value,
+      spoolLabel: label,
+      startWeight
     };
-    list.parentNode.appendChild(btn);
-  }
+  });
 
-  // Hide Load More button if no more history
-  if (end >= usageHistory.length) {
-    const btn = document.getElementById("loadMoreHistoryBtn");
-    if (btn) btn.style.display = "none";
-  } else {
-    const btn = document.getElementById("loadMoreHistoryBtn");
-    if (btn) btn.style.display = "inline-block";
+  activePrintJob = {
+    jobId: Date.now(),
+    jobName: jobName || `Print ${new Date().toLocaleString()}`,
+    spools,
+    startTime: new Date().toISOString(),
+  };
+
+  localStorage.setItem("activePrintJob", JSON.stringify(activePrintJob));
+
+  showEndPrintSection();
+}
+
+function showEndPrintSection() {
+  document.getElementById("startPrintSection").classList.add("hidden");
+  document.getElementById("endPrintSection").classList.remove("hidden");
+  document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
+
+  const container = document.getElementById("endWeightsContainer");
+  container.innerHTML = "";
+  activePrintJob.spools.forEach(spool => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label>${spool.spoolLabel} End Weight (g):</label>
+      <input type="number" id="endWeight_${spool.spoolId}" step="0.01" />
+    `;
+    container.appendChild(div);
+  });
+}
+
+function endPrintJob() {
+  const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
+  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
+
+  const updatedSpools = activePrintJob.spools.map(spoolData => {
+    const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
+    if (isNaN(endWeight)) {
+      alert("Please enter all end weights.");
+      throw new Error("Missing end weights");
+    }
+    const gramsUsed = spoolData.startWeight - endWeight;
+
+    // Find the correct spool index in the current spools array
+    const spoolIndex = parseInt(spoolData.spoolId, 10);
+    if (spoolIndex !== -1) {
+      spools[spoolIndex].weight = endWeight;  // update weight
+    }
+
+    return {
+      ...spoolData,
+      endWeight,
+      gramsUsed,
+      used: gramsUsed,
+    };
+  });
+
+  // Save updated spools and history
+  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
+  
+  history.push({
+    jobId: activePrintJob.jobId,
+    jobName: activePrintJob.jobName,
+    spools: updatedSpools,
+    startTime: activePrintJob.startTime,
+    endTime: new Date().toISOString()
+  });
+
+  localStorage.setItem("usageHistory", JSON.stringify(history));
+  localStorage.removeItem("activePrintJob");
+  activePrintJob = null;
+
+  alert("Print job ended and usage recorded.");
+  showScreen("home");
+}
+
+function cancelActiveJob() {
+  if (confirm("Cancel the active print job? Progress will be lost.")) {
+    localStorage.removeItem("activePrintJob");
+    activePrintJob = null;
+    showScreen("home");
   }
 }
 
-// Reset pagination on showScreen("history")
-function resetHistoryPagination() {
-  historyPage = 0;
-}
+// UI helper to show start weights when spools selected
+document.getElementById("selectSpools")?.addEventListener("change", () => {
+  const container = document.getElementById("startWeightsContainer");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  const selected = Array.from(document.getElementById("selectSpools").selectedOptions);
+  selected.forEach(opt => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label>${opt.text} Start Weight (g):</label>
+      <input type="number" id="startWeight_${opt.value}" step="0.01" />
+    `;
+    container.appendChild(div);
+  });
+});
 
+// Restore job if page reloads
 window.addEventListener("load", () => {
   const savedJob = JSON.parse(localStorage.getItem("activePrintJob"));
   if (savedJob) {
@@ -720,5 +531,86 @@ window.addEventListener("load", () => {
     showEndPrintSection();
   }
 });
+
+function highlightSpool(spoolId) {
+  const spoolList = document.getElementById('spoolList');
+  const items = spoolList.querySelectorAll('li');
+
+  // Clear previous highlights
+  items.forEach(item => item.style.backgroundColor = '');
+
+  // spoolId might be string or number — compare as string for safety
+  const targetItem = [...items].find(li => li.getAttribute('data-spool-id') === spoolId.toString());
+
+  if (targetItem) {
+    targetItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetItem.style.backgroundColor = 'yellow';
+
+    setTimeout(() => {
+      targetItem.style.backgroundColor = '';
+    }, 3000);
+  }
+}
+
+// ----- Filter Helper Functions -----
+function populateHistorySpoolDropdown() {
+  const spoolSelect = document.getElementById("filterSpool");
+  if (!spoolSelect) return;
+
+  spoolSelect.innerHTML = '<option value="">All Spools</option>';
+
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  const uniqueLabels = new Set();
+
+  usageHistory.forEach(job => {
+    job.spools.forEach(spool => {
+      uniqueLabels.add(spool.spoolLabel);
+    });
+  });
+
+  [...uniqueLabels].sort().forEach(label => {
+    const option = document.createElement("option");
+    option.value = label;
+    option.textContent = label;
+    spoolSelect.appendChild(option);
+  });
+}
+
+function applyHistoryFilters() {
+  renderHistoryFiltered(false);
+}
+
+function clearHistoryFilters() {
+  const s = document.getElementById("filterStartDate");
+  const e = document.getElementById("filterEndDate");
+  const f = document.getElementById("filterSpool");
+  if (s) s.value = "";
+  if (e) e.value = "";
+  if (f) f.value = "";
+  renderHistoryFiltered(true); // back to last 10
+}
+
+function setupLiveFilters() {
+  const startDateInput = document.getElementById("filterStartDate");
+  const endDateInput = document.getElementById("filterEndDate");
+  const spoolSelect = document.getElementById("filterSpool");
+  const filterBtn = document.getElementById("filterButton");
+  const clearBtn = document.getElementById("clearFilterButton");
+
+  const updateFilters = () => renderHistoryFiltered(false);
+
+  startDateInput?.addEventListener("change", updateFilters);
+  endDateInput?.addEventListener("change", updateFilters);
+  spoolSelect?.addEventListener("change", updateFilters);
+
+  filterBtn?.addEventListener("click", updateFilters);
+  clearBtn?.addEventListener("click", () => clearHistoryFilters());
+}
+
+function resetHistoryPagination() {
+  historyPage = 0;
+}
+
+
 
 window.showScreen = showScreen;
