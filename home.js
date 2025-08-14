@@ -604,3 +604,4 @@ historyPage = 0;
 }
 
 window.showScreen = showScreen;
+
