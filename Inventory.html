@@ -2,62 +2,72 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Spool Inventory</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Filament Tracker — Inventory</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#007acc" />
 </head>
 <body>
-  <!-- Shared navigation -->
-  <nav>
-    <button onclick="window.location.href='index.html'">Home</button>
-    <button onclick="window.location.href='inventory.html'">Inventory</button>
-    <button onclick="window.location.href='history.html'">History</button>
-    <button onclick="window.location.href='settings.html'">Settings</button>
-  </nav>
+  <header>
+    <h1>Filament Tracker</h1>
+  </header>
 
-  <main class="container">
-    <h1>Spool Inventory</h1>
-    
-    <!-- Section for adding spools -->
+  <main id="inventory">
+    <h2>Spool Inventory</h2>
+
+    <!-- Add New Spool -->
     <section id="addSpoolSection">
-      <h2>Add New Spool</h2>
-      <form id="addSpoolForm">
-        <label>
-          Name:
-          <input type="text" id="spoolName" required />
-        </label>
-        <label>
-          Material:
-          <input type="text" id="spoolMaterial" required />
-        </label>
-        <label>
-          Weight (g):
-          <input type="number" id="spoolWeight" required />
-        </label>
-        <label>
-          Empty Spool Weight (g):
-          <input type="number" id="spoolEmptyWeight" required />
-        </label>
-        <button type="submit">Add Spool</button>
-      </form>
+      <h3>Add New Spool</h3>
+
+      <input id="brand" placeholder="Brand" />
+      <input id="color" placeholder="Color" />
+
+      <select id="materialSelect" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-bottom: 10px;"></select>
+
+      <input
+        type="text"
+        id="customMaterialInput"
+        placeholder="Enter custom material"
+        class="hidden"
+        style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-bottom: 10px;"
+      />
+
+      <input id="length" type="number" placeholder="Length (m)" />
+      <input id="weight" type="number" placeholder="Weight (g)" />
+
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:6px;">
+        <button id="saveSpoolBtn">Save Spool</button>
+        <a href="emptyspools.html" class="menu-button">Manage Empty Spool Weights</a>
+      </div>
     </section>
 
-    <!-- Table for inventory -->
-    <section id="inventorySection">
-      <h2>Current Inventory</h2>
-      <table id="inventoryTable" border="1">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Material</th>
-            <th>Total Weight</th>
-            <th>Empty Spool Weight</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <!-- Inventory Table -->
+    <section id="inventoryListSection" style="margin-top:20px;">
+      <h3>Current Inventory</h3>
+      <div class="table-wrapper">
+        <table id="inventoryTable">
+          <thead>
+            <tr>
+              <th>Brand</th>
+              <th>Color</th>
+              <th>Material</th>
+              <th>Length (m)</th>
+              <th>Weight (g)</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody><!-- rows injected dynamically --></tbody>
+        </table>
+      </div>
     </section>
+
+    <div style="margin-top:20px;">
+      <button onclick="smartBack()">⬅ Back</button>
+    </div>
   </main>
+
+  <footer id="footer">© Data Forge</footer>
 
   <script src="inventory.js"></script>
 </body>
