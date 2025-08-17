@@ -45,18 +45,19 @@ function renderInventoryTable() {
     const tr = document.createElement("tr");
     tr.dataset.index = index;
 
-    tr.innerHTML = `
-      <td class="cell-brand"><span>${escapeHtml(spool.brand)}</span></td>
-      <td class="cell-color"><span>${escapeHtml(spool.color)}</span></td>
-      <td class="cell-material"><span>${escapeHtml(spool.material)}</span></td>
-      <td class="cell-length"><span>${Number(spool.length).toFixed(2)}</span></td>
-      <td class="cell-weight"><span>${Number(spool.weight).toFixed(2)}</span></td>
-      <td class="cell-actions">
-        <button class="edit-btn">Edit</button>
-        <button class="save-btn hidden">Save</button>
-        <button class="cancel-btn hidden">Cancel</button>
-      </td>
-    `;
+   tr.innerHTML = `
+   <td class="cell-brand"><span>${escapeHtml(spool.brand)}</span></td>
+   <td class="cell-color"><span>${escapeHtml(spool.color)}</span></td>
+   <td class="cell-material"><span>${escapeHtml(spool.material)}</span></td>
+   <td class="cell-length"><span>${Number(spool.length).toFixed(2)}</span></td>
+   <td class="cell-weight"><span>${Number(spool.weight).toFixed(2)}</span></td>
+   <td class="cell-empty"><span>${spool.emptyWeight !== undefined ? Number(spool.emptyWeight).toFixed(2) : ""}</span></td>
+   <td class="cell-actions">
+     <button class="edit-btn">Edit</button>
+     <button class="save-btn hidden">Save</button>
+     <button class="cancel-btn hidden">Cancel</button>
+   </td>
+`;
 
     tbody.appendChild(tr);
   });
