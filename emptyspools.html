@@ -2,91 +2,44 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Empty Spools</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Empty Spool Weights</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <h1>Empty Spools</h1>
+  <header>
+    <h1>Empty Spool Weights</h1>
+  </header>
 
-    <!-- Back button (always to home2.html) -->
-    <button class="btn" onclick="location.href='home2.html'">⬅ Back</button>
+  <main id="emptySpoolsMain">
+    <section>
+      <h2>Add New Empty Spool</h2>
+      <input id="newBrand" placeholder="Brand" style="padding: 10px; font-size:1em; margin-right:5px;" />
+      <input id="newPackage" placeholder="Package/Size" style="padding: 10px; font-size:1em; margin-right:5px;" />
+      <input id="newWeight" type="number" placeholder="Weight (g)" style="padding: 10px; font-size:1em; margin-right:5px; width:100px;" />
+      <button id="addEmptySpoolBtn">Add</button>
+    </section>
 
-    <!-- Empty Spools Form -->
-    <form id="emptySpoolsForm">
-      <label for="brand">Brand:</label>
-      <input type="text" id="brand" name="brand" required />
+    <section style="margin-top: 20px;">
+      <h2>Existing Empty Spools</h2>
+      <table id="emptySpoolsTable" style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:8px;">Brand</th>
+            <th style="text-align:left; padding:8px;">Package/Size</th>
+            <th style="text-align:left; padding:8px;">Default Weight (g)</th>
+            <th style="text-align:left; padding:8px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Rows inserted dynamically -->
+        </tbody>
+      </table>
+    </section>
 
-      <label for="size">Spool Size (e.g., 1kg, 0.75kg):</label>
-      <input type="text" id="size" name="size" required />
+    <button onclick="window.location='home2.html'" style="margin-top:20px;">⬅ Back</button>
+  </main>
 
-      <label for="emptyWeight">Empty Spool Weight (g):</label>
-      <input type="number" id="emptyWeight" name="emptyWeight" step="0.01" required />
-
-      <button type="submit" class="btn">Add Empty Spool</button>
-    </form>
-
-    <!-- Table of Empty Spools -->
-    <h2>Saved Empty Spools</h2>
-    <table id="emptySpoolsTable" class="data-table">
-      <thead>
-        <tr>
-          <th>Brand</th>
-          <th>Size</th>
-          <th>Empty Weight (g)</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <script>
-    let emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
-
-    function renderEmptySpools() {
-      const tableBody = document.querySelector("#emptySpoolsTable tbody");
-      tableBody.innerHTML = "";
-      emptySpools.forEach((spool, index) => {
-        const row = document.createElement("tr");
-
-        row.innerHTML = `
-          <td>${spool.brand}</td>
-          <td>${spool.size}</td>
-          <td>${spool.emptyWeight}</td>
-          <td>
-            <button class="btn delete-btn" onclick="deleteEmptySpool(${index})">Delete</button>
-          </td>
-        `;
-
-        tableBody.appendChild(row);
-      });
-    }
-
-    function deleteEmptySpool(index) {
-      emptySpools.splice(index, 1);
-      localStorage.setItem("emptySpools", JSON.stringify(emptySpools));
-      renderEmptySpools();
-    }
-
-    document.getElementById("emptySpoolsForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-
-      const brand = document.getElementById("brand").value.trim();
-      const size = document.getElementById("size").value.trim();
-      const emptyWeight = parseFloat(document.getElementById("emptyWeight").value);
-
-      if (brand && size && !isNaN(emptyWeight)) {
-        emptySpools.push({ brand, size, emptyWeight });
-        localStorage.setItem("emptySpools", JSON.stringify(emptySpools));
-        renderEmptySpools();
-        this.reset();
-      }
-    });
-
-    // Initial render
-    renderEmptySpools();
-  </script>
+  <script src="emptyspools.js"></script>
 </body>
 </html>
