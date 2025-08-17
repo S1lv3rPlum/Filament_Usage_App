@@ -14,6 +14,8 @@ let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
 ];
 
 let activePrintJob = null; // Will hold current job data
+let historyDisplayCount = 10; // how many entries to show
+let historyPage = 0; // current page (0 = newest 10)
 
 // ----- Screen Navigation -----
 function showScreen(id) {
@@ -21,7 +23,10 @@ function showScreen(id) {
   document.getElementById(id).classList.remove("hidden");
 
   if (id === "library") renderLibrary();
-  if (id === "history") renderHistory();
+  if (id === "history") {
+    resetHistoryPagination();
+    renderHistory();
+  }
 
   if (id === "tracking") {
     populateSpoolMultiSelect();
@@ -188,31 +193,60 @@ function renderLibrary() {
   });
 }
 
-// ----- Render History -----
+// ----- Render History with Filtering -----
 function renderHistory() {
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  populateHistorySpoolDropdown();
+  renderHistoryFiltered(true); // show last 10 by default
+  setupLiveFilters();
+}
+
+function renderHistoryFiltered(defaultLastTen = false) {
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+
+  const startDateVal = document.getElementById("filterStartDate")?.value || "";
+  const endDateVal = document.getElementById("filterEndDate")?.value || "";
+  const spoolLabel = document.getElementById("filterSpool")?.value || "";
+
+  const startDate = startDateVal ? new Date(startDateVal) : null;
+  const endDate = endDateVal ? new Date(endDateVal) : null;
+  if (endDate) endDate.setHours(23, 59, 59, 999); // include entire day
+
+  // Filter first
+  let filtered = usageHistory.filter(job => {
+    const jobDate = new Date(job.startTime);
+    if (startDate && jobDate < startDate) return false;
+    if (endDate && jobDate > endDate) return false;
+    if (!spoolLabel) return true;
+    return job.spools.some(s => (s.spoolLabel || "").toLowerCase().includes(spoolLabel.toLowerCase()));
+  });
+
+  // Sort newest first
+  filtered.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+
+  // If no filters and defaultLastTen requested, slice to last 10
+  const noFiltersApplied = !startDateVal && !endDateVal && !spoolLabel;
+  if (defaultLastTen && noFiltersApplied) {
+    filtered = filtered.slice(0, 10);
+  }
+
   const list = document.getElementById("historyList");
   list.innerHTML = "";
 
-  if (history.length === 0) {
-    list.innerHTML = "<li>No usage history available</li>";
+  if (filtered.length === 0) {
+    list.innerHTML = "<li>No usage history found for the selected filters.</li>";
     return;
   }
 
-  history.forEach(job => {
+  filtered.forEach(job => {
     const li = document.createElement("li");
-    let spoolDetails = job.spools.map((s, i) =>
-      `<a href="#" class="spool-link" data-spool-index="${s.spoolId}">${s.spoolLabel}</a>: ${s.used.toFixed(2)} g used`
+    let spoolDetails = job.spools.map(s =>
+      `<a href="#" class="spool-link" data-spool-index="${s.spoolId}">${s.spoolLabel}</a>: ${(s.used || 0).toFixed(2)} g used`
     ).join("<br>");
-    li.innerHTML = `
-      <strong>${job.jobName}</strong> 
-      <small>(${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()})</small>
-      <br>${spoolDetails}
-    `;
+    li.innerHTML = `<strong>${job.jobName}</strong> <small>(${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()})</small><br>${spoolDetails}`;
     list.appendChild(li);
   });
 
-  // Add click handlers to all spool links
+  // Add click handlers to spool links
   document.querySelectorAll('.spool-link').forEach(link => {
     link.addEventListener('click', e => {
       e.preventDefault();
@@ -230,14 +264,31 @@ function renderAnalytics() {
 
   const ctx = canvas.getContext('2d');
 
-  // Clear canvas for re-rendering (if you want to re-run multiple times)
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Destroy existing chart instance if exists to prevent overlap
+  if (window.usageChartInstance) {
+    window.usageChartInstance.destroy();
+  }
 
-  // Aggregate usage by material
+  // Aggregate usage by material from new data structure
   const usageByMaterial = {};
-  usageHistory.forEach(usage => {
-    if (usage.spoolMaterial) {
-      usageByMaterial[usage.spoolMaterial] = (usageByMaterial[usage.spoolMaterial] || 0) + (usage.lengthUsed || 0);
+  
+  usageHistory.forEach(job => {
+    // Handle new format (print jobs with spools array)
+    if (job.spools && Array.isArray(job.spools)) {
+      job.spools.forEach(spool => {
+        // Extract material from spoolLabel: "Brand - Color (Material) (Weight)"
+        const materialMatch = spool.spoolLabel.match(/\(([^)]+)\)/);
+        const material = materialMatch ? materialMatch[1] : "Unknown";
+        const used = spool.used || spool.gramsUsed || 0;
+        
+        usageByMaterial[material] = (usageByMaterial[material] || 0) + used;
+      });
+    }
+    // Handle legacy format (if any old data exists)
+    else if (job.spoolMaterial && job.lengthUsed) {
+      const material = job.spoolMaterial;
+      const used = job.lengthUsed || 0;
+      usageByMaterial[material] = (usageByMaterial[material] || 0) + used;
     }
   });
 
@@ -253,26 +304,44 @@ function renderAnalytics() {
     return;
   }
 
-  // Destroy existing chart instance if exists to prevent overlap
-  if (window.usageChartInstance) {
-    window.usageChartInstance.destroy();
-  }
-
   window.usageChartInstance = new Chart(ctx, {
     type: 'pie',
     data: {
       labels: labels,
       datasets: [{
-        label: 'Filament Used (m)',
+        label: 'Filament Used (grams)',
         data: data,
         backgroundColor: [
-          '#007acc', '#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40'
+          '#007acc', '#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40', 
+          '#ff6384', '#4bc0c0', '#ffce56'
         ],
+        borderWidth: 2,
+        borderColor: '#fff'
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            padding: 15,
+            usePointStyle: true
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const label = context.label || '';
+              const value = context.parsed || 0;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = ((value / total) * 100).toFixed(1);
+              return `${label}: ${value.toFixed(1)}g (${percentage}%)`;
+            }
+          }
+        }
+      }
     }
   });
 }
@@ -313,10 +382,7 @@ function showUpdatePrompt(onConfirm) {
   prompt.style.borderRadius = "8px";
   prompt.style.boxShadow = "0 4px 6px rgba(0,0,0,0.2)";
   prompt.style.zIndex = "9999";
-  prompt.innerHTML = `
-    <span style="margin-right:10px;">Update available</span>
-    <button style="background:#fff;color:#007acc;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">Update</button>
-  `;
+  prompt.innerHTML = `<span style="margin-right:10px;">Update available</span><button style="background:#fff;color:#007acc;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">Update</button>`;
 
   prompt.querySelector("button").addEventListener("click", () => {
     document.body.removeChild(prompt);
@@ -406,10 +472,7 @@ function showEndPrintSection() {
   container.innerHTML = "";
   activePrintJob.spools.forEach(spool => {
     const div = document.createElement("div");
-    div.innerHTML = `
-      <label>${spool.spoolLabel} End Weight (g):</label>
-      <input type="number" id="endWeight_${spool.spoolId}" step="0.01" />
-    `;
+    div.innerHTML = `<label>${spool.spoolLabel} End Weight (g):</label><input type="number" id="endWeight_${spool.spoolId}" step="0.01" />`;
     container.appendChild(div);
   });
 }
@@ -442,7 +505,7 @@ function endPrintJob() {
 
   // Save updated spools and history
   localStorage.setItem("spoolLibrary", JSON.stringify(spools));
-  
+
   history.push({
     jobId: activePrintJob.jobId,
     jobName: activePrintJob.jobName,
@@ -471,15 +534,12 @@ function cancelActiveJob() {
 document.getElementById("selectSpools")?.addEventListener("change", () => {
   const container = document.getElementById("startWeightsContainer");
   if (!container) return;
-  
+
   container.innerHTML = "";
   const selected = Array.from(document.getElementById("selectSpools").selectedOptions);
   selected.forEach(opt => {
     const div = document.createElement("div");
-    div.innerHTML = `
-      <label>${opt.text} Start Weight (g):</label>
-      <input type="number" id="startWeight_${opt.value}" step="0.01" />
-    `;
+    div.innerHTML = `<label>${opt.text} Start Weight (g):</label><input type="number" id="startWeight_${opt.value}" step="0.01" />`;
     container.appendChild(div);
   });
 });
@@ -511,6 +571,65 @@ function highlightSpool(spoolId) {
       targetItem.style.backgroundColor = '';
     }, 3000);
   }
+}
+
+// ----- Filter Helper Functions -----
+function populateHistorySpoolDropdown() {
+  const spoolSelect = document.getElementById("filterSpool");
+  if (!spoolSelect) return;
+
+  spoolSelect.innerHTML = '<option value="">All Spools</option>';
+
+  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  const uniqueLabels = new Set();
+
+  usageHistory.forEach(job => {
+    job.spools.forEach(spool => {
+      uniqueLabels.add(spool.spoolLabel);
+    });
+  });
+
+  [...uniqueLabels].sort().forEach(label => {
+    const option = document.createElement("option");
+    option.value = label;
+    option.textContent = label;
+    spoolSelect.appendChild(option);
+  });
+}
+
+function applyHistoryFilters() {
+  renderHistoryFiltered(false);
+}
+
+function clearHistoryFilters() {
+  const s = document.getElementById("filterStartDate");
+  const e = document.getElementById("filterEndDate");
+  const f = document.getElementById("filterSpool");
+  if (s) s.value = "";
+  if (e) e.value = "";
+  if (f) f.value = "";
+  renderHistoryFiltered(true); // back to last 10
+}
+
+function setupLiveFilters() {
+  const startDateInput = document.getElementById("filterStartDate");
+  const endDateInput = document.getElementById("filterEndDate");
+  const spoolSelect = document.getElementById("filterSpool");
+  const filterBtn = document.getElementById("filterButton");
+  const clearBtn = document.getElementById("clearFilterButton");
+
+  const updateFilters = () => renderHistoryFiltered(false);
+
+  startDateInput?.addEventListener("change", updateFilters);
+  endDateInput?.addEventListener("change", updateFilters);
+  spoolSelect?.addEventListener("change", updateFilters);
+
+  filterBtn?.addEventListener("click", updateFilters);
+  clearBtn?.addEventListener("click", () => clearHistoryFilters());
+}
+
+function resetHistoryPagination() {
+  historyPage = 0;
 }
 
 window.showScreen = showScreen;
