@@ -83,3 +83,16 @@ addBtn.addEventListener("click", addEmptySpool);
 
 // ----- Initial Render -----
 renderTable();
+
+
+// ---- go back Button
+
+function goBack() {
+  if (document.referrer && document.referrer !== window.location.href) {
+    // Go back if there's a valid referrer
+    window.history.back();
+  } else {
+    // Fallback if no history (direct entry, bookmark, etc.)
+    window.location.href = "home2.html"; 
+  }
+}
