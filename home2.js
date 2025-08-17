@@ -76,6 +76,68 @@ function handleMaterialChange() {
   }
 }
 
+// ----- Data Storage for Empty Spools -----
+let emptySpoolsLibrary = JSON.parse(localStorage.getItem("emptySpoolsLibrary")) || [];
+
+// ----- Utils -----
+function saveEmptySpoolsLibrary() {
+  localStorage.setItem("emptySpoolsLibrary", JSON.stringify(emptySpoolsLibrary));
+}
+
+// ----- Populate dropdown -----
+function populateEmptySpoolDropdown() {
+  const select = document.getElementById("emptySpoolSelect");
+  select.innerHTML = "";
+
+  // Default option
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "None";
+  select.appendChild(noneOpt);
+
+  // Existing empty spools
+  emptySpoolsLibrary.forEach((spool, idx) => {
+    const opt = document.createElement("option");
+    opt.value = idx; // index reference
+    opt.textContent = `${spool.brand} – ${spool.package} (${spool.weight} g)`;
+    select.appendChild(opt);
+  });
+
+  // Other option
+  const otherOpt = document.createElement("option");
+  otherOpt.value = "other";
+  otherOpt.textContent = "Other (Add new…)";
+  select.appendChild(otherOpt);
+
+  select.value = "";
+}
+
+// ----- Handle "Other" option -----
+document.getElementById("emptySpoolSelect").addEventListener("change", e => {
+  if (e.target.value === "other") {
+    window.open("emptyspools.html", "_blank"); // open in new tab
+    e.target.value = ""; // reset to none until they refresh
+  }
+});
+
+// ----- Hook into saveNewSpool() -----
+function saveNewSpool() {
+  // existing code...
+
+  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
+  let emptySpoolId = emptySpoolSelect.value === "" ? null : Number(emptySpoolSelect.value);
+
+  spoolLibrary.push({ brand, color, material, length, weight, emptySpoolId });
+  saveSpoolLibrary();
+
+  // reset form
+  // ...
+  populateEmptySpoolDropdown();
+
+  alert("Spool saved!");
+  renderInventoryTable();
+}
+
 // ----- Save Spool -----
 function saveSpool() {
   const brand = document.getElementById("brand").value.trim();
