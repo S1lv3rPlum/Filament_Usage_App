@@ -1,10 +1,9 @@
-// ----- Data Storage (shared keys with home2.js) -----
+// ----- Data Storage -----
 let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
 let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
   "PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"
 ];
 
-// ----- Utils -----
 function saveSpoolLibrary() {
   localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
 }
@@ -26,85 +25,6 @@ function smartBack() {
   window.location.href = "home2.html";
 }
 window.smartBack = smartBack;
-
-// ----- Add Form: material dropdown + custom toggle -----
-function populateMaterialDropdown() {
-  const select = document.getElementById("materialSelect");
-  select.innerHTML = "";
-  materialsList.forEach(material => {
-    const option = document.createElement("option");
-    option.value = material;
-    option.textContent = material;
-    select.appendChild(option);
-  });
-  select.value = materialsList[0];
-  const custom = document.getElementById("customMaterialInput");
-  custom.classList.add("hidden");
-  custom.value = "";
-}
-
-function handleMaterialChange() {
-  const select = document.getElementById("materialSelect");
-  const custom = document.getElementById("customMaterialInput");
-  if (select.value === "Custom") {
-    custom.classList.remove("hidden");
-  } else {
-    custom.classList.add("hidden");
-    custom.value = "";
-  }
-}
-
-// ----- Add Form: save new spool -----
-function saveNewSpool() {
-  const brand = document.getElementById("brand").value.trim();
-  const color = document.getElementById("color").value.trim();
-
-  const materialSelect = document.getElementById("materialSelect");
-  let material = materialSelect.value;
-
-  const customMaterial = document.getElementById("customMaterialInput").value.trim();
-
-  if (material === "Custom") {
-    if (!customMaterial) {
-      alert("Please enter a custom material.");
-      return;
-    }
-    material = customMaterial;
-
-    // Insert new custom material before "Custom"
-    if (!materialsList.includes(material)) {
-      const customIndex = materialsList.indexOf("Custom");
-      const insertAt = customIndex === -1 ? materialsList.length : customIndex;
-      materialsList.splice(insertAt, 0, material);
-      saveMaterialsList();
-    }
-  }
-
-  const length = parseFloat(document.getElementById("length").value);
-  const weight = parseFloat(document.getElementById("weight").value);
-
-  if (!brand || !color || !material) {
-    alert("Brand, Color, and Material are required.");
-    return;
-  }
-  if (isNaN(length) || isNaN(weight)) {
-    alert("Length and Weight must be numbers.");
-    return;
-  }
-
-  spoolLibrary.push({ brand, color, material, length, weight });
-  saveSpoolLibrary();
-
-  // reset form
-  document.getElementById("brand").value = "";
-  document.getElementById("color").value = "";
-  populateMaterialDropdown();
-  document.getElementById("length").value = "";
-  document.getElementById("weight").value = "";
-
-  alert("Spool saved!");
-  renderInventoryTable();
-}
 
 // ----- Inventory table rendering & inline editing -----
 function renderInventoryTable() {
@@ -159,9 +79,9 @@ function attachRowHandlers() {
 function buildMaterialSelectForRow(currentValue) {
   const sel = document.createElement("select");
   sel.className = "row-material-select";
-  // ensure currentValue is present
   const list = [...materialsList];
-  if (!list.includes(currentValue) && currentValue !== "Custom") list.splice(Math.max(0, list.length - 1), 0, currentValue);
+  if (!list.includes(currentValue) && currentValue !== "Custom")
+    list.splice(Math.max(0, list.length - 1), 0, currentValue);
   list.forEach(m => {
     const opt = document.createElement("option");
     opt.value = m;
@@ -194,40 +114,27 @@ function buildMaterialSelectForRow(currentValue) {
 function enterEditMode(tr) {
   const idx = Number(tr.dataset.index);
   const data = spoolLibrary[idx];
-
-  // Store original values on the row element
   tr._orig = { ...data };
 
-  // brand
-  const brandCell = tr.querySelector(".cell-brand");
-  brandCell.innerHTML = `<input type="text" class="row-brand" value="${escapeHtml(data.brand)}" />`;
+  tr.querySelector(".cell-brand").innerHTML =
+    `<input type="text" class="row-brand" value="${escapeHtml(data.brand)}" />`;
+  tr.querySelector(".cell-color").innerHTML =
+    `<input type="text" class="row-color" value="${escapeHtml(data.color)}" />`;
 
-  // color
-  const colorCell = tr.querySelector(".cell-color");
-  colorCell.innerHTML = `<input type="text" class="row-color" value="${escapeHtml(data.color)}" />`;
-
-  // material (select + optional custom)
   const materialCell = tr.querySelector(".cell-material");
   materialCell.innerHTML = "";
-  const matControl = buildMaterialSelectForRow(data.material);
-  materialCell.appendChild(matControl);
+  materialCell.appendChild(buildMaterialSelectForRow(data.material));
 
-  // length
-  const lengthCell = tr.querySelector(".cell-length");
-  lengthCell.innerHTML = `<input type="number" step="0.01" class="row-length" value="${Number(data.length)}" />`;
+  tr.querySelector(".cell-length").innerHTML =
+    `<input type="number" step="0.01" class="row-length" value="${Number(data.length)}" />`;
+  tr.querySelector(".cell-weight").innerHTML =
+    `<input type="number" step="0.01" class="row-weight" value="${Number(data.weight)}" />`;
 
-  // weight
-  const weightCell = tr.querySelector(".cell-weight");
-  weightCell.innerHTML = `<input type="number" step="0.01" class="row-weight" value="${Number(data.weight)}" />`;
-
-  // buttons
   tr.querySelector(".edit-btn").classList.add("hidden");
-  tr.querySelector(".save-btn").classList.add("hidden"); // show only when changed
+  tr.querySelector(".save-btn").classList.add("hidden");
   tr.querySelector(".cancel-btn").classList.remove("hidden");
 
-  // change detection → show Save only when something changes
-  const inputs = getRowInputs(tr);
-  inputs.forEach(el => el.addEventListener("input", () => updateSaveVisibility(tr)));
+  getRowInputs(tr).forEach(el => el.addEventListener("input", () => updateSaveVisibility(tr)));
 }
 
 function exitEditMode(tr, useLatest = true) {
@@ -248,13 +155,14 @@ function exitEditMode(tr, useLatest = true) {
 }
 
 function getRowInputs(tr) {
-  const brand = tr.querySelector(".row-brand");
-  const color = tr.querySelector(".row-color");
-  const matSelect = tr.querySelector(".row-material-select");
-  const matCustom = tr.querySelector(".row-custom-material-input");
-  const length = tr.querySelector(".row-length");
-  const weight = tr.querySelector(".row-weight");
-  return [brand, color, matSelect, matCustom, length, weight].filter(Boolean);
+  return [
+    tr.querySelector(".row-brand"),
+    tr.querySelector(".row-color"),
+    tr.querySelector(".row-material-select"),
+    tr.querySelector(".row-custom-material-input"),
+    tr.querySelector(".row-length"),
+    tr.querySelector(".row-weight"),
+  ].filter(Boolean);
 }
 
 function currentRowValues(tr) {
@@ -263,7 +171,7 @@ function currentRowValues(tr) {
   let material = matSel ? matSel.value : "";
   if (material === "Custom") {
     const val = (matCustom?.value || "").trim();
-    material = val || ""; // empty if not provided -> will fail validation
+    material = val || "";
   }
 
   return {
@@ -288,32 +196,24 @@ function hasChanges(tr) {
 }
 
 function updateSaveVisibility(tr) {
-  const changed = hasChanges(tr);
-  tr.querySelector(".save-btn").classList.toggle("hidden", !changed);
+  tr.querySelector(".save-btn").classList.toggle("hidden", !hasChanges(tr));
 }
 
 function onEditRow(e) {
-  const tr = e.target.closest("tr");
-  enterEditMode(tr);
+  enterEditMode(e.target.closest("tr"));
 }
-
 function onCancelRow(e) {
-  const tr = e.target.closest("tr");
-  exitEditMode(tr, false); // revert to original values
+  exitEditMode(e.target.closest("tr"), false);
 }
-
 function onSaveRow(e) {
   const tr = e.target.closest("tr");
   if (!hasChanges(tr)) {
-    // nothing changed; keep hidden but allow exit if desired
     exitEditMode(tr, true);
     return;
   }
-
   const idx = Number(tr.dataset.index);
   const vals = currentRowValues(tr);
 
-  // Validation
   if (!vals.brand || !vals.color || !vals.material) {
     alert("Brand, Color, and Material cannot be empty.");
     return;
@@ -323,7 +223,6 @@ function onSaveRow(e) {
     return;
   }
 
-  // If material is new, insert before "Custom"
   if (!materialsList.includes(vals.material)) {
     const customIndex = materialsList.indexOf("Custom");
     const insertAt = customIndex === -1 ? materialsList.length : customIndex;
@@ -331,24 +230,10 @@ function onSaveRow(e) {
     saveMaterialsList();
   }
 
-  // Save to library (row-level save)
-  spoolLibrary[idx] = {
-    brand: vals.brand,
-    color: vals.color,
-    material: vals.material,
-    length: vals.length,
-    weight: vals.weight
-  };
+  spoolLibrary[idx] = vals;
   saveSpoolLibrary();
-
-  // Update UI in place
   exitEditMode(tr, true);
 }
 
 // ----- Init -----
-document.addEventListener("DOMContentLoaded", () => {
-  populateMaterialDropdown();
-  document.getElementById("materialSelect").addEventListener("change", handleMaterialChange);
-  document.getElementById("saveSpoolBtn").addEventListener("click", saveNewSpool);
-  renderInventoryTable();
-});
+document.addEventListener("DOMContentLoaded", renderInventoryTable);
