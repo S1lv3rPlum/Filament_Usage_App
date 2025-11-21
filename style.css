@@ -3,7 +3,9 @@ body {
   margin: 0;
   padding: 0;
   background: #f0f4f8;
+  padding-bottom: 60px; /* Space for fixed footer */
 }
+
 header {
   background: #007acc;
   color: white;
@@ -11,13 +13,16 @@ header {
   font-size: 1.3em;
   text-align: center;
 }
+
 .screen {
   display: none;
   padding: 20px;
 }
+
 .active {
   display: block;
 }
+
 button {
   display: block;
   margin: 15px auto;
@@ -31,13 +36,16 @@ button {
   width: 90%;
   max-width: 350px;
 }
+
 button:hover {
   background: #005f99;
 }
+
 .back-btn {
   background: #ccc;
   color: #333;
 }
+
 input, select {
   width: 90%;
   max-width: 350px;
@@ -48,6 +56,7 @@ input, select {
   border-radius: 6px;
   font-size: 1em;
 }
+
 .list-item {
   background: white;
   margin: 8px auto;
@@ -60,53 +69,14 @@ input, select {
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-body {
-  font-family: sans-serif;
-  margin: 0;
-  padding: 0;
-  background: #f4f4f4;
-  color: #333;
-}
-
-header {
-  background: #007acc;
-  color: white;
-  padding: 10px;
-  text-align: center;
-}
-
 main, section {
   padding: 15px;
-}
-
-button {
-  display: block;
-  width: 100%;
-  margin: 8px 0;
-  padding: 10px;
-  background: #007acc;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  font-size: 16px;
-}
-
-button:hover {
-  background: #005f99;
+  padding-bottom: 80px; /* Extra space above footer for buttons */
 }
 
 .hidden {
   display: none;
 }
-
-input {
-  width: 100%;
-  padding: 8px;
-  margin: 5px 0;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-}
-
 
 #footer {
   position: fixed;
@@ -121,4 +91,111 @@ input {
   box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
   user-select: none;
   z-index: 1000;
+}
+
+/* Button container for sections - ensures buttons stay above footer */
+.button-container {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+}
+
+/* Specific spacing for back buttons at bottom of sections */
+section > button:last-of-type,
+main > button:last-of-type {
+  margin-bottom: 30px;
+}
+
+/* Table styling */
+.table-wrapper {
+  overflow-x: auto;
+  margin: 20px 0;
+  padding-bottom: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+table th,
+table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+table th {
+  background: #007acc;
+  color: white;
+  font-weight: bold;
+}
+
+table tr:hover {
+  background: #f5f5f5;
+}
+
+table button {
+  width: auto;
+  padding: 8px 12px;
+  margin: 2px;
+  font-size: 0.9em;
+}
+
+/* Inline editing styles */
+.row-brand,
+.row-color,
+.row-length,
+.row-weight,
+.row-material-select,
+.row-custom-material-input {
+  width: 100%;
+  padding: 6px;
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.row-custom-material-input {
+  margin-top: 5px;
+}
+
+/* Menu button styling */
+.menu-button {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #007acc;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  margin: 10px 0;
+}
+
+.menu-button:hover {
+  background: #005f99;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  body {
+    padding-bottom: 70px;
+  }
+  
+  main, section {
+    padding-bottom: 90px;
+  }
+  
+  button {
+    font-size: 1em;
+    padding: 12px 20px;
+  }
+  
+  table {
+    font-size: 0.85em;
+  }
+  
+  table th,
+  table td {
+    padding: 8px;
+  }
 }
