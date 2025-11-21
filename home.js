@@ -41,7 +41,10 @@ function showScreen(id) {
     }
   }
 
-  if (id === "addSpool") populateMaterialDropdown();
+  if (id === "addSpool") {
+    populateMaterialDropdown();
+    populateEmptySpoolDropdown();
+  }
   if (id === "analytics") renderAnalytics();
   if (id === "settings") {
     // Setup for settings if needed
@@ -77,16 +80,18 @@ function handleMaterialChange() {
 }
 
 // ----- Data Storage for Empty Spools -----
-let emptySpoolsLibrary = JSON.parse(localStorage.getItem("emptySpoolsLibrary")) || [];
+let emptySpoolsLibrary = JSON.parse(localStorage.getItem("emptySpools")) || [];
 
 // ----- Utils -----
 function saveEmptySpoolsLibrary() {
-  localStorage.setItem("emptySpoolsLibrary", JSON.stringify(emptySpoolsLibrary));
+  localStorage.setItem("emptySpools", JSON.stringify(emptySpoolsLibrary));
 }
 
 // ----- Populate dropdown -----
 function populateEmptySpoolDropdown() {
   const select = document.getElementById("emptySpoolSelect");
+  if (!select) return;
+  
   select.innerHTML = "";
 
   // Default option
@@ -113,30 +118,17 @@ function populateEmptySpoolDropdown() {
 }
 
 // ----- Handle "Other" option -----
-document.getElementById("emptySpoolSelect").addEventListener("change", e => {
-  if (e.target.value === "other") {
-    window.open("emptyspools.html", "_blank"); // open in new tab
-    e.target.value = ""; // reset to none until they refresh
+document.addEventListener("DOMContentLoaded", () => {
+  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
+  if (emptySpoolSelect) {
+    emptySpoolSelect.addEventListener("change", e => {
+      if (e.target.value === "other") {
+        window.open("emptyspools.html", "_blank"); // open in new tab
+        e.target.value = ""; // reset to none until they refresh
+      }
+    });
   }
 });
-
-// ----- Hook into saveNewSpool() -----
-function saveNewSpool() {
-  // existing code...
-
-  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
-  let emptySpoolId = emptySpoolSelect.value === "" ? null : Number(emptySpoolSelect.value);
-
-  spoolLibrary.push({ brand, color, material, length, weight, emptySpoolId });
-  saveSpoolLibrary();
-
-  // reset form
-  // ...
-  populateEmptySpoolDropdown();
-
-  alert("Spool saved!");
-  renderInventoryTable();
-}
 
 // ----- Save Spool -----
 function saveSpool() {
@@ -163,15 +155,21 @@ function saveSpool() {
     }
   }
 
-  const length = parseFloat(document.getElementById("length").value);
+  const lengthInput = document.getElementById("length").value;
+  const length = lengthInput ? parseFloat(lengthInput) : 0; // Length is now optional
   const weight = parseFloat(document.getElementById("weight").value);
 
-  if (!brand || !color || !material || isNaN(length) || isNaN(weight)) {
-    alert("Please fill out all fields.");
+  // Only require brand, color, material, and weight - length is optional
+  if (!brand || !color || !material || isNaN(weight)) {
+    alert("Please fill out Brand, Color, Material, and Weight fields.");
     return;
   }
 
-  spoolLibrary.push({ brand, color, material, length, weight });
+  // Get empty spool reference if selected
+  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
+  let emptySpoolId = emptySpoolSelect.value === "" ? null : Number(emptySpoolSelect.value);
+
+  spoolLibrary.push({ brand, color, material, length, weight, emptySpoolId });
   localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
 
   // Reset form
@@ -180,6 +178,7 @@ function saveSpool() {
   populateMaterialDropdown();
   document.getElementById("length").value = "";
   document.getElementById("weight").value = "";
+  populateEmptySpoolDropdown();
 
   alert("Spool saved!");
   showScreen("library");
@@ -250,7 +249,8 @@ function renderLibrary() {
   spoolLibrary.forEach((spool, index) => {
     const li = document.createElement("li");
     li.setAttribute('data-spool-id', index.toString());  // Set data attribute for id
-    li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${spool.length}m, ${spool.weight}g)`;
+    const lengthDisplay = spool.length > 0 ? `${spool.length}m, ` : '';
+    li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${lengthDisplay}${spool.weight}g)`;
     list.appendChild(li);
   });
 }
