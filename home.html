@@ -16,9 +16,7 @@
 
 <main id="home">
   <button onclick="showScreen('addSpool')">➕ Add New Spool</button>
-<button onclick="window.location.href='inventory.html'">📦 View Inventory</button>
- 
- 
+  <button onclick="window.location.href='inventory.html'">📦 View Inventory</button>
   <button onclick="window.location.href='emptyspools.html'">🧵 Empty Spool Weights</button>
   <button onclick="showScreen('history')">📜 Usage History</button>
   <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
@@ -26,9 +24,7 @@
   <button onclick="showScreen('settings')">⚙️ Settings</button>
 </main>
 
-
-
- <section id="addSpool" class="hidden">
+<section id="addSpool" class="hidden">
   <h2>Add New Spool</h2>
   <input id="brand" placeholder="Brand" />
   <input id="color" placeholder="Color" />
@@ -45,21 +41,24 @@
     style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-bottom: 10px;"
   />
   
-  <input id="length" type="number" placeholder="Length (m)" />
+  <input id="length" type="number" placeholder="Length (m) - Optional" />
   <input id="weight" type="number" placeholder="Weight (g)" />
   <label for="emptySpoolSelect">Empty Spool:</label>
-<select id="emptySpoolSelect"></select>
-  <button onclick="saveSpool()">Save Spool</button>
-  <button type="button" id="manageEmptySpoolsBtn">Manage Empty Spools</button>
-  <button onclick="showScreen('home')">⬅ Back</button>
+  <select id="emptySpoolSelect"></select>
+  
+  <div class="button-container">
+    <button onclick="saveSpool()">Save Spool</button>
+    <button type="button" id="manageEmptySpoolsBtn">Manage Empty Spools</button>
+    <button onclick="showScreen('home')">⬅ Back</button>
+  </div>
 </section>
 
-  <!-- Inventory Screen -->
-  <section id="library" class="hidden">
-    <h2>Spool Library</h2>
-    <ul id="spoolList"></ul>
-    <button onclick="showScreen('home')">⬅ Back</button>
-  </section>
+<!-- Inventory Screen -->
+<section id="library" class="hidden">
+  <h2>Spool Library</h2>
+  <ul id="spoolList"></ul>
+  <button onclick="showScreen('home')">⬅ Back</button>
+</section>
 
 <section id="history" class="hidden">
   <h2>Usage History</h2>
@@ -91,53 +90,52 @@
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
 
-
-  <!-- Tracking / Print Jobs Screen -->
+<!-- Tracking / Print Jobs Screen -->
 <section id="tracking" class="hidden">
   <h2>Print Job Tracking</h2>
 
   <!-- Start Print Form -->
- <section id="startPrintSection">
-  <h2>Start Print Job</h2>
-  <input id="jobName" placeholder="Enter print job name (optional)" />
-  <label for="selectSpools">Select Spools (multi-select):</label>
-  <select id="selectSpools" multiple size="5" style="width: 100%;"></select>
-  <div id="startWeightsContainer"></div>
-  <button onclick="startPrintJob()">Start Print</button>
-  <button onclick="showScreen('home')">⬅ Back</button>
-  
+  <section id="startPrintSection">
+    <h2>Start Print Job</h2>
+    <input id="jobName" placeholder="Enter print job name (optional)" />
+    <label for="selectSpools">Select Spools (multi-select):</label>
+    <select id="selectSpools" multiple size="5" style="width: 100%;"></select>
+    <div id="startWeightsContainer"></div>
+    
+    <div class="button-container">
+      <button onclick="startPrintJob()">Start Print</button>
+      <button onclick="showScreen('home')">⬅ Back</button>
+    </div>
+  </section>
+
+  <section id="endPrintSection" class="hidden">
+    <h3 id="activeJobName"></h3>
+    <div id="endWeightsContainer"></div>
+    
+    <div class="button-container">
+      <button onclick="endPrintJob()">End Print</button>
+      <button onclick="cancelActiveJob()">Cancel Job</button>
+      <button onclick="showScreen('home')">⬅ Back</button>
+    </div>
+  </section>
 </section>
 
-<section id="endPrintSection" class="hidden">
-  <h3 id="activeJobName"></h3>
-  <div id="endWeightsContainer"></div>
-  <button onclick="endPrintJob()">End Print</button>
-  <button onclick="cancelActiveJob()">Cancel Job</button>
-  <button onclick="showScreen('home')">⬅ Back</button>
-</section>
-</section>
-
-<!--  Analytics screen -->
+<!-- Analytics screen -->
 <section id="analytics" class="hidden" style="height:400px; position:relative;">
   <h2>Analytics</h2>
   <canvas id="usageChart"></canvas>
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
-  
-  
-  <!-- Settings Screen -->
+
+<!-- Settings Screen -->
 <section id="settings" class="hidden">
   <h2>Settings</h2>
   <button id="checkUpdatesBtn">Check for Updates</button>
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
-  
-  
 
-  <footer id="footer">© Data Forge</footer>
+<footer id="footer">© Data Forge</footer>
 
-
-  <script src="home2.js"></script>
-  
+<script src="home.js"></script>
 </body>
 </html>
