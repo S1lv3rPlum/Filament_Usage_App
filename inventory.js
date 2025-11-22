@@ -59,12 +59,15 @@ function renderInventoryTable() {
       ? getEmptySpoolLabel(spool.emptySpoolId) 
       : "None";
 
+    // Display the CALCULATED filament weight (weight field)
+    let weightDisplay = `${Number(spool.weight).toFixed(2)}g`;
+    
     tr.innerHTML = `
    <td class="cell-brand"><span>${escapeHtml(spool.brand)}</span></td>
    <td class="cell-color"><span>${escapeHtml(spool.color)}</span></td>
    <td class="cell-material"><span>${escapeHtml(spool.material)}</span></td>
    <td class="cell-length"><span>${spool.length > 0 ? Number(spool.length).toFixed(2) : 'N/A'}</span></td>
-   <td class="cell-weight"><span>${Number(spool.weight).toFixed(2)}</span></td>
+   <td class="cell-weight"><span>${weightDisplay}</span></td>
    <td class="cell-empty"><span>${emptySpoolDisplay}</span></td>
    <td class="cell-actions">
      <button class="edit-btn">Edit</button>
@@ -167,8 +170,11 @@ function enterEditMode(tr) {
 
   tr.querySelector(".cell-length").innerHTML =
     `<input type="number" step="0.01" class="row-length" value="${Number(data.length) || 0}" />`;
+  
+  // Edit the FILAMENT weight (current calculated weight)
   tr.querySelector(".cell-weight").innerHTML =
-    `<input type="number" step="0.01" class="row-weight" value="${Number(data.weight)}" />`;
+    `<input type="number" step="0.01" class="row-weight" value="${Number(data.weight)}" />
+     <small style="display:block; color:#666; margin-top:3px;">Filament weight (current)</small>`;
 
   const emptySpoolCell = tr.querySelector(".cell-empty");
   emptySpoolCell.innerHTML = "";
@@ -190,11 +196,13 @@ function exitEditMode(tr, useLatest = true) {
     ? getEmptySpoolLabel(data.emptySpoolId) 
     : "None";
 
+  let weightDisplay = `${Number(data.weight).toFixed(2)}g`;
+
   tr.querySelector(".cell-brand").innerHTML = `<span>${escapeHtml(data.brand)}</span>`;
   tr.querySelector(".cell-color").innerHTML = `<span>${escapeHtml(data.color)}</span>`;
   tr.querySelector(".cell-material").innerHTML = `<span>${escapeHtml(data.material)}</span>`;
   tr.querySelector(".cell-length").innerHTML = `<span>${data.length > 0 ? Number(data.length).toFixed(2) : 'N/A'}</span>`;
-  tr.querySelector(".cell-weight").innerHTML = `<span>${Number(data.weight).toFixed(2)}</span>`;
+  tr.querySelector(".cell-weight").innerHTML = `<span>${weightDisplay}</span>`;
   tr.querySelector(".cell-empty").innerHTML = `<span>${emptySpoolDisplay}</span>`;
 
   tr.querySelector(".edit-btn").classList.remove("hidden");
@@ -286,7 +294,14 @@ function onSaveRow(e) {
     saveMaterialsList();
   }
 
-  spoolLibrary[idx] = vals;
+  // Keep the existing fullSpoolWeight and emptyWeight values
+  const existingSpool = spoolLibrary[idx];
+  spoolLibrary[idx] = {
+    ...vals,
+    fullSpoolWeight: existingSpool.fullSpoolWeight,
+    emptyWeight: existingSpool.emptyWeight
+  };
+  
   saveSpoolLibrary();
   exitEditMode(tr, true);
 }
