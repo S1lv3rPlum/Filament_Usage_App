@@ -93,6 +93,6 @@ function goBack() {
     window.history.back();
   } else {
     // Fallback if no history (direct entry, bookmark, etc.)
-    window.location.href = "home2.html"; 
+    window.location.href = "home.html"; 
   }
 }

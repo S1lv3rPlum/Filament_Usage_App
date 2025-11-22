@@ -3,30 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Filament Foundry</title>
+  <title>Filament Tracker</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#007acc" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <header>
-   <dev><img src="FilamentFoundryLogo.png" alt="Filament Foundry Logo" width="200">
-   <h1>Filament Foundry</h1></dev>
-  </header>
+<header>
+  <h1>Filament Foundry</h1>
+  <p style="font-size: 0.85em; margin-top: 5px; opacity: 0.9;">by DataForge</p>
+</header>
 
 <main id="home">
   <button onclick="showScreen('addSpool')">➕ Add New Spool</button>
-  <button onclick="showScreen('library')">📦 View Inventory</button>
+  <button onclick="window.location.href='inventory.html'">📦 View Inventory</button>
+  <button onclick="window.location.href='emptyspools.html'">🧵 Empty Spool Weights</button>
   <button onclick="showScreen('history')">📜 Usage History</button>
   <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
   <button onclick="showScreen('analytics')">📊 Analytics</button>
   <button onclick="showScreen('settings')">⚙️ Settings</button>
 </main>
 
-
-
- <section id="addSpool" class="hidden">
+<section id="addSpool" class="hidden">
   <h2>Add New Spool</h2>
   <input id="brand" placeholder="Brand" />
   <input id="color" placeholder="Color" />
@@ -43,18 +42,24 @@
     style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-bottom: 10px;"
   />
   
-  <input id="length" type="number" placeholder="Length (m)" />
+  <input id="length" type="number" placeholder="Length (m) - Optional" />
   <input id="weight" type="number" placeholder="Weight (g)" />
-  <button onclick="saveSpool()">Save Spool</button>
-  <button onclick="showScreen('home')">⬅ Back</button>
+  <label for="emptySpoolSelect">Empty Spool:</label>
+  <select id="emptySpoolSelect"></select>
+  
+  <div class="button-container">
+    <button onclick="saveSpool()">Save Spool</button>
+    <button type="button" id="manageEmptySpoolsBtn">Manage Empty Spools</button>
+    <button onclick="showScreen('home')">⬅ Back</button>
+  </div>
 </section>
 
-  <!-- Inventory Screen -->
-  <section id="library" class="hidden">
-    <h2>Spool Library</h2>
-    <ul id="spoolList"></ul>
-    <button onclick="showScreen('home')">⬅ Back</button>
-  </section>
+<!-- Inventory Screen -->
+<section id="library" class="hidden">
+  <h2>Spool Library</h2>
+  <ul id="spoolList"></ul>
+  <button onclick="showScreen('home')">⬅ Back</button>
+</section>
 
 <section id="history" class="hidden">
   <h2>Usage History</h2>
@@ -86,52 +91,71 @@
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
 
-
-  <!-- Tracking / Print Jobs Screen -->
+<!-- Tracking / Print Jobs Screen -->
 <section id="tracking" class="hidden">
   <h2>Print Job Tracking</h2>
 
-  <!-- Start Print Form -->
- <section id="startPrintSection">
+<!-- Start Print Form -->
+<section id="startPrintSection">
   <h2>Start Print Job</h2>
   <input id="jobName" placeholder="Enter print job name (optional)" />
   <label for="selectSpools">Select Spools (multi-select):</label>
   <select id="selectSpools" multiple size="5" style="width: 100%;"></select>
-  <div id="startWeightsContainer"></div>
-  <button onclick="startPrintJob()">Start Print</button>
-  <button onclick="showScreen('home')">⬅ Back</button>
   
+  <!-- NEW: Estimated weight fields will appear here per spool -->
+  <div id="estimatedWeightsContainer"></div>
+  
+  <div class="button-container">
+    <button onclick="startPrintJob()">Start Print</button>
+    <button onclick="showScreen('home')">⬅ Back</button>
+  </div>
 </section>
 
-<section id="endPrintSection" class="hidden">
+  <section id="endPrintSection" class="hidden">
   <h3 id="activeJobName"></h3>
   <div id="endWeightsContainer"></div>
-  <button onclick="endPrintJob()">End Print</button>
-  <button onclick="cancelActiveJob()">Cancel Job</button>
-  <button onclick="showScreen('home')">⬅ Back</button>
+  
+  <div class="button-container">
+    <button onclick="endPrintJob()">✅ End Print (Success)</button>
+    <button onclick="failedPrintJob()" style="background: #ff6b6b;">❌ Failed Print</button>
+    <button onclick="cancelActiveJob()">Cancel Job</button>
+    <button onclick="showScreen('home')">⬅ Back</button>
+  </div>
 </section>
 </section>
 
-<!--  Analytics screen -->
+<!-- Analytics screen -->
 <section id="analytics" class="hidden" style="height:400px; position:relative;">
   <h2>Analytics</h2>
   <canvas id="usageChart"></canvas>
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
-  
-  
-  <!-- Settings Screen -->
+
+<!-- Settings Screen -->
 <section id="settings" class="hidden">
   <h2>Settings</h2>
+  
+  <!-- Material Management -->
+  <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
+    <h3>Manage Material Types</h3>
+    <ul id="materialsList" style="list-style: none; padding: 0;"></ul>
+    
+    <div style="margin-top: 15px;">
+      <input id="newMaterialInput" placeholder="Add new material type" style="width: 70%; display: inline-block;" />
+      <button onclick="addNewMaterial()" style="width: 25%; display: inline-block; margin-left: 3%;">Add</button>
+    </div>
+  </div>
+  
   <button id="checkUpdatesBtn">Check for Updates</button>
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
-  
-  
 
-  <footer id="footer">© Data Forge</footer>
+<footer id="footer">
+  © 2025 DataForge | 
+  <a href="https://getdataforge.com" style="color: #a6d1ff; text-decoration: none;">getdataforge.com</a> | 
+  <a href="mailto:DataForgeApps@gmail.com" style="color: #a6d1ff; text-decoration: none;">Contact</a>
+</footer>
 
-
-  <script src="home.js"></script>
+<script src="home.js"></script>
 </body>
 </html>

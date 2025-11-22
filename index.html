@@ -1,17 +1,16 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DataForge Apps</title>
-
-  <!-- Manifest for PWA -->
-  <link rel="manifest" href="manifest.json" />
-
+  <title>DataForge - Filament Tracker</title>
   <style>
-    body {
+    * {
       margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
       font-family: system-ui, sans-serif;
       color: white;
       display: flex;
@@ -24,28 +23,23 @@
       animation: gradient 15s ease infinite;
       text-align: center;
     }
-
     @keyframes gradient {
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
-
     h1 {
       font-size: 2rem;
       margin-bottom: 0.5rem;
     }
-
     p {
       font-size: 1.1rem;
       margin: 0.2rem 0;
     }
-
     .subtle {
       font-size: 0.9rem;
       opacity: 0.7;
     }
-
     .spinner {
       margin: 30px auto;
       width: 50px;
@@ -55,11 +49,9 @@
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
-
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-
     a {
       color: #a6d1ff;
       text-decoration: none;
@@ -73,31 +65,29 @@
   <p class="subtle">Redirecting to app...</p>
   <p class="subtle">Contact: <a href="mailto:DataForgeApps@gmail.com">DataForgeApps@gmail.com</a></p>
   <p class="subtle"><a href="https://getdataforge.com">getdataforge.com</a></p>
-
   
-   <script>
-  // Delayed redirect with error fallback
-  setTimeout(() => {
-    fetch('home.html')
-      .then(response => {
-        if (response.ok) {
-          window.location.href = 'home.html';
-        } else {
-          alert("home.html not found.");
-        }
-      })
-      .catch(() => alert("Network error. Couldn't load home.html."));
-  }, 3000);
-</script>
-
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js', {scope: './'})
-        .then(() => console.log("✅ SW registered"))
-        .catch(err => console.error("❌ SW registration failed:", err));
-    });
-  }
-</script>
+  <script>
+    // Delayed redirect with error fallback
+    setTimeout(() => {
+      fetch('home.html')
+        .then(response => {
+          if (response.ok) {
+            window.location.href = 'home.html';
+          } else {
+            alert("home.html not found.");
+          }
+        })
+        .catch(() => alert("Network error. Couldn't load home2.html."));
+    }, 3000);
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js', {scope: './'})
+          .then(() => console.log("✅ SW registered"))
+          .catch(err => console.error("❌ SW registration failed:", err));
+      });
+    }
+  </script>
 </body>
 </html>
