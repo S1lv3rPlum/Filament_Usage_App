@@ -35,6 +35,7 @@ function showScreen(id) {
       document.getElementById("startPrintSection").classList.add("hidden");
       document.getElementById("endPrintSection").classList.remove("hidden");
       document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
+      showEndPrintSection(); // Re-render the end section
     } else {
       document.getElementById("startPrintSection").classList.remove("hidden");
       document.getElementById("endPrintSection").classList.add("hidden");
@@ -47,7 +48,98 @@ function showScreen(id) {
   }
   if (id === "analytics") renderAnalytics();
   if (id === "settings") {
-    // Setup for settings if needed
+  renderMaterialsList(); // Render materials list when opening settings
+}
+}
+
+// ----- Material Management Functions -----
+function renderMaterialsList() {
+  const list = document.getElementById("materialsList");
+  if (!list) return;
+  
+  list.innerHTML = "";
+  
+  materialsList.forEach((material, index) => {
+    const li = document.createElement("li");
+    li.style.padding = "10px";
+    li.style.marginBottom = "8px";
+    li.style.background = "#f0f4f8";
+    li.style.borderRadius = "6px";
+    li.style.display = "flex";
+    li.style.justifyContent = "space-between";
+    li.style.alignItems = "center";
+    
+    const span = document.createElement("span");
+    span.textContent = material;
+    span.style.fontWeight = "500";
+    
+    li.appendChild(span);
+    
+    // Don't allow deleting "Custom"
+    if (material !== "Custom") {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Delete";
+      deleteBtn.style.width = "auto";
+      deleteBtn.style.padding = "6px 12px";
+      deleteBtn.style.background = "#ff6b6b";
+      deleteBtn.style.fontSize = "0.9em";
+      deleteBtn.onclick = () => deleteMaterial(index);
+      li.appendChild(deleteBtn);
+    } else {
+      const label = document.createElement("small");
+      label.textContent = "(Default)";
+      label.style.color = "#666";
+      li.appendChild(label);
+    }
+    
+    list.appendChild(li);
+  });
+}
+
+function addNewMaterial() {
+  const input = document.getElementById("newMaterialInput");
+  const newMaterial = input.value.trim();
+  
+  if (!newMaterial) {
+    alert("Please enter a material name.");
+    return;
+  }
+  
+  if (materialsList.includes(newMaterial)) {
+    alert("This material already exists.");
+    return;
+  }
+  
+  // Insert before "Custom"
+  const customIndex = materialsList.indexOf("Custom");
+  if (customIndex !== -1) {
+    materialsList.splice(customIndex, 0, newMaterial);
+  } else {
+    materialsList.push(newMaterial);
+  }
+  
+  localStorage.setItem("materialsList", JSON.stringify(materialsList));
+  input.value = "";
+  renderMaterialsList();
+  alert(`Material "${newMaterial}" added!`);
+}
+
+function deleteMaterial(index) {
+  const material = materialsList[index];
+  
+  // Check if any spools use this material
+  const spoolsUsingMaterial = spoolLibrary.filter(spool => spool.material === material);
+  
+  if (spoolsUsingMaterial.length > 0) {
+    alert(`Cannot delete "${material}" because ${spoolsUsingMaterial.length} spool(s) are using it. Please update or remove those spools first.`);
+    return;
+  }
+  
+  if (confirm(`Delete material type "${material}"?`)) {
+    materialsList.splice(index, 1);
+    localStorage.setItem("materialsList", JSON.stringify(materialsList));
+    renderMaterialsList();
+    alert(`Material "${material}" deleted.`);
   }
 }
 
@@ -301,10 +393,11 @@ function renderHistoryFiltered(defaultLastTen = false) {
 
   filtered.forEach(job => {
     const li = document.createElement("li");
+    const statusBadge = job.status === "failed" ? "❌ " : "";
     let spoolDetails = job.spools.map(s =>
       `<a href="#" class="spool-link" data-spool-index="${s.spoolId}">${s.spoolLabel}</a>: ${(s.used || 0).toFixed(2)} g used`
     ).join("<br>");
-    li.innerHTML = `<strong>${job.jobName}</strong> <small>(${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()})</small><br>${spoolDetails}`;
+    li.innerHTML = `<strong>${statusBadge}${job.jobName}</strong> <small>(${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()})</small><br>${spoolDetails}`;
     list.appendChild(li);
   });
 
@@ -496,7 +589,6 @@ function startPrintJob() {
   }
 
   const spools = selectedOptions.map(opt => {
-    // Use the current weight from spoolLibrary directly, no need to ask for start weight input
     const spoolInfo = allSpools[opt.value] || {};
     const startWeight = spoolInfo.weight;
     if (typeof startWeight !== "number" || isNaN(startWeight)) {
@@ -504,12 +596,17 @@ function startPrintJob() {
       throw new Error("Invalid start weight");
     }
 
+    // Get estimated weight (optional)
+    const estimatedInput = document.getElementById(`estimatedWeight_${opt.value}`);
+    const estimatedWeight = estimatedInput ? parseFloat(estimatedInput.value) || null : null;
+
     const label = `${spoolInfo.brand || "Unknown"} - ${spoolInfo.color || "?"} (${spoolInfo.material || "?"}) (${startWeight}g)`;
 
     return {
       spoolId: opt.value,
       spoolLabel: label,
-      startWeight
+      startWeight,
+      estimatedWeight // Store for reference
     };
   });
 
@@ -532,9 +629,31 @@ function showEndPrintSection() {
 
   const container = document.getElementById("endWeightsContainer");
   container.innerHTML = "";
+  
   activePrintJob.spools.forEach(spool => {
     const div = document.createElement("div");
-    div.innerHTML = `<label>${spool.spoolLabel} End Weight (g):</label><input type="number" id="endWeight_${spool.spoolId}" step="0.01" />`;
+    div.style.marginBottom = "15px";
+    
+    // Calculate expected final weight if estimated was provided
+    let calculatedFinalWeight = "";
+    let estimatedText = "";
+    if (spool.estimatedWeight) {
+      calculatedFinalWeight = (spool.startWeight - spool.estimatedWeight).toFixed(2);
+      estimatedText = `<small style="color: #666;">(Estimated usage: ${spool.estimatedWeight}g → Expected final: ${calculatedFinalWeight}g)</small>`;
+    }
+    
+    div.innerHTML = `
+      <label>${spool.spoolLabel} ${estimatedText}<br>
+      Final Weight After Print (g) - Optional if estimated:</label>
+      <input 
+        type="number" 
+        id="endWeight_${spool.spoolId}" 
+        step="0.01" 
+        value="${calculatedFinalWeight}"
+        placeholder="${spool.estimatedWeight ? 'Auto-calculated' : 'Enter final weight'}"
+        style="width: 100%; padding: 8px; margin-top: 5px;" 
+      />
+    `;
     container.appendChild(div);
   });
 }
@@ -544,11 +663,27 @@ function endPrintJob() {
   const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
 
   const updatedSpools = activePrintJob.spools.map(spoolData => {
-    const endWeight = parseFloat(document.getElementById(`endWeight_${spoolData.spoolId}`).value);
-    if (isNaN(endWeight)) {
-      alert("Please enter all end weights.");
+    const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
+    let endWeight;
+    
+    // If user provided a weight, use it
+    if (endWeightInput && endWeightInput.trim() !== "") {
+      endWeight = parseFloat(endWeightInput);
+      if (isNaN(endWeight)) {
+        alert("Invalid weight entered. Please check your inputs.");
+        throw new Error("Invalid end weight");
+      }
+    } 
+    // If estimated weight was provided, calculate final weight
+    else if (spoolData.estimatedWeight) {
+      endWeight = spoolData.startWeight - spoolData.estimatedWeight;
+    } 
+    // No estimate and no input - error
+    else {
+      alert("Please enter final weight for all spools (or provide estimated usage when starting print).");
       throw new Error("Missing end weights");
     }
+    
     const gramsUsed = spoolData.startWeight - endWeight;
 
     // Find the correct spool index in the current spools array
@@ -573,7 +708,8 @@ function endPrintJob() {
     jobName: activePrintJob.jobName,
     spools: updatedSpools,
     startTime: activePrintJob.startTime,
-    endTime: new Date().toISOString()
+    endTime: new Date().toISOString(),
+    status: "success" // Mark as successful
   });
 
   localStorage.setItem("usageHistory", JSON.stringify(history));
@@ -581,6 +717,65 @@ function endPrintJob() {
   activePrintJob = null;
 
   alert("Print job ended and usage recorded.");
+  showScreen("home");
+}
+
+function failedPrintJob() {
+  if (!confirm("Mark this print as failed? You must weigh your spools and enter the actual final weights.")) {
+    return;
+  }
+  
+  const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
+  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
+
+  const updatedSpools = activePrintJob.spools.map(spoolData => {
+    const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
+    
+    if (!endWeightInput || endWeightInput.trim() === "") {
+      alert("For failed prints, you must weigh and enter the actual final weight for all spools.");
+      throw new Error("Missing end weights for failed print");
+    }
+    
+    const endWeight = parseFloat(endWeightInput);
+    if (isNaN(endWeight)) {
+      alert("Invalid weight entered. Please check your inputs.");
+      throw new Error("Invalid end weight");
+    }
+    
+    const gramsUsed = spoolData.startWeight - endWeight;
+
+    // Update spool weight in library
+    const spoolIndex = parseInt(spoolData.spoolId, 10);
+    if (spoolIndex !== -1) {
+      spools[spoolIndex].weight = endWeight;
+    }
+
+    return {
+      ...spoolData,
+      endWeight,
+      gramsUsed,
+      used: gramsUsed,
+    };
+  });
+
+  // Save updated spools
+  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
+
+  // Record in history with "FAILED" status
+  history.push({
+    jobId: activePrintJob.jobId,
+    jobName: `FAILED: ${activePrintJob.jobName}`,
+    spools: updatedSpools,
+    startTime: activePrintJob.startTime,
+    endTime: new Date().toISOString(),
+    status: "failed"
+  });
+
+  localStorage.setItem("usageHistory", JSON.stringify(history));
+  localStorage.removeItem("activePrintJob");
+  activePrintJob = null;
+
+  alert("Failed print recorded. Spool weights updated.");
   showScreen("home");
 }
 
@@ -592,16 +787,25 @@ function cancelActiveJob() {
   }
 }
 
-// UI helper to show start weights when spools selected
+// UI helper to show estimated weights when spools selected
 document.getElementById("selectSpools")?.addEventListener("change", () => {
-  const container = document.getElementById("startWeightsContainer");
+  const container = document.getElementById("estimatedWeightsContainer");
   if (!container) return;
 
   container.innerHTML = "";
   const selected = Array.from(document.getElementById("selectSpools").selectedOptions);
+  
+  if (selected.length > 0) {
+    const heading = document.createElement("h3");
+    heading.textContent = "Estimated Filament Needed:";
+    heading.style.marginTop = "15px";
+    container.appendChild(heading);
+  }
+  
   selected.forEach(opt => {
     const div = document.createElement("div");
-    div.innerHTML = `<label>${opt.text} Start Weight (g):</label><input type="number" id="startWeight_${opt.value}" step="0.01" />`;
+    div.style.marginBottom = "10px";
+    div.innerHTML = `<label>${opt.text} - Estimated Weight (g):</label><input type="number" id="estimatedWeight_${opt.value}" step="0.01" placeholder="Optional" style="width: 100%; padding: 8px; margin-top: 5px;" />`;
     container.appendChild(div);
   });
 });

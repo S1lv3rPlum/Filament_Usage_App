@@ -22,9 +22,19 @@ function smartBack() {
       return;
     }
   } catch (_) {}
-  window.location.href = "home2.html";
+  window.location.href = "home.html";
 }
 window.smartBack = smartBack;
+
+// Helper to get empty spool label by ID
+function getEmptySpoolLabel(emptySpoolId) {
+  const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
+  const emptySpool = emptySpools[emptySpoolId];
+  if (emptySpool) {
+    return `${emptySpool.brand} - ${emptySpool.package} (${emptySpool.weight}g)`;
+  }
+  return "";
+}
 
 // ----- Inventory table rendering & inline editing -----
 function renderInventoryTable() {
@@ -34,7 +44,7 @@ function renderInventoryTable() {
   if (spoolLibrary.length === 0) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 6;
+    td.colSpan = 7;
     td.textContent = "No spools in inventory";
     tr.appendChild(td);
     tbody.appendChild(tr);
@@ -45,13 +55,17 @@ function renderInventoryTable() {
     const tr = document.createElement("tr");
     tr.dataset.index = index;
 
-   tr.innerHTML = `
+    const emptySpoolDisplay = spool.emptySpoolId !== null && spool.emptySpoolId !== undefined 
+      ? getEmptySpoolLabel(spool.emptySpoolId) 
+      : "None";
+
+    tr.innerHTML = `
    <td class="cell-brand"><span>${escapeHtml(spool.brand)}</span></td>
    <td class="cell-color"><span>${escapeHtml(spool.color)}</span></td>
    <td class="cell-material"><span>${escapeHtml(spool.material)}</span></td>
-   <td class="cell-length"><span>${Number(spool.length).toFixed(2)}</span></td>
+   <td class="cell-length"><span>${spool.length > 0 ? Number(spool.length).toFixed(2) : 'N/A'}</span></td>
    <td class="cell-weight"><span>${Number(spool.weight).toFixed(2)}</span></td>
-   <td class="cell-empty"><span>${spool.emptyWeight !== undefined ? Number(spool.emptyWeight).toFixed(2) : ""}</span></td>
+   <td class="cell-empty"><span>${emptySpoolDisplay}</span></td>
    <td class="cell-actions">
      <button class="edit-btn">Edit</button>
      <button class="save-btn hidden">Save</button>
@@ -112,6 +126,31 @@ function buildMaterialSelectForRow(currentValue) {
   return wrapper;
 }
 
+function buildEmptySpoolSelectForRow(currentValue) {
+  const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
+  const sel = document.createElement("select");
+  sel.className = "row-empty-spool-select";
+
+  // None option
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "None";
+  sel.appendChild(noneOpt);
+
+  // Existing empty spools
+  emptySpools.forEach((spool, idx) => {
+    const opt = document.createElement("option");
+    opt.value = idx;
+    opt.textContent = `${spool.brand} - ${spool.package} (${spool.weight}g)`;
+    sel.appendChild(opt);
+  });
+
+  // Set current value
+  sel.value = currentValue !== null && currentValue !== undefined ? currentValue : "";
+
+  return sel;
+}
+
 function enterEditMode(tr) {
   const idx = Number(tr.dataset.index);
   const data = spoolLibrary[idx];
@@ -127,26 +166,36 @@ function enterEditMode(tr) {
   materialCell.appendChild(buildMaterialSelectForRow(data.material));
 
   tr.querySelector(".cell-length").innerHTML =
-    `<input type="number" step="0.01" class="row-length" value="${Number(data.length)}" />`;
+    `<input type="number" step="0.01" class="row-length" value="${Number(data.length) || 0}" />`;
   tr.querySelector(".cell-weight").innerHTML =
     `<input type="number" step="0.01" class="row-weight" value="${Number(data.weight)}" />`;
 
+  const emptySpoolCell = tr.querySelector(".cell-empty");
+  emptySpoolCell.innerHTML = "";
+  emptySpoolCell.appendChild(buildEmptySpoolSelectForRow(data.emptySpoolId));
+
   tr.querySelector(".edit-btn").classList.add("hidden");
-  tr.querySelector(".save-btn").classList.add("hidden");
+  tr.querySelector(".save-btn").classList.remove("hidden");
   tr.querySelector(".cancel-btn").classList.remove("hidden");
 
   getRowInputs(tr).forEach(el => el.addEventListener("input", () => updateSaveVisibility(tr)));
+  getRowInputs(tr).forEach(el => el.addEventListener("change", () => updateSaveVisibility(tr)));
 }
 
 function exitEditMode(tr, useLatest = true) {
   const idx = Number(tr.dataset.index);
   const data = useLatest ? spoolLibrary[idx] : tr._orig;
 
+  const emptySpoolDisplay = data.emptySpoolId !== null && data.emptySpoolId !== undefined 
+    ? getEmptySpoolLabel(data.emptySpoolId) 
+    : "None";
+
   tr.querySelector(".cell-brand").innerHTML = `<span>${escapeHtml(data.brand)}</span>`;
   tr.querySelector(".cell-color").innerHTML = `<span>${escapeHtml(data.color)}</span>`;
   tr.querySelector(".cell-material").innerHTML = `<span>${escapeHtml(data.material)}</span>`;
-  tr.querySelector(".cell-length").innerHTML = `<span>${Number(data.length).toFixed(2)}</span>`;
+  tr.querySelector(".cell-length").innerHTML = `<span>${data.length > 0 ? Number(data.length).toFixed(2) : 'N/A'}</span>`;
   tr.querySelector(".cell-weight").innerHTML = `<span>${Number(data.weight).toFixed(2)}</span>`;
+  tr.querySelector(".cell-empty").innerHTML = `<span>${emptySpoolDisplay}</span>`;
 
   tr.querySelector(".edit-btn").classList.remove("hidden");
   tr.querySelector(".save-btn").classList.add("hidden");
@@ -163,11 +212,12 @@ function getRowInputs(tr) {
     tr.querySelector(".row-custom-material-input"),
     tr.querySelector(".row-length"),
     tr.querySelector(".row-weight"),
+    tr.querySelector(".row-empty-spool-select"),
   ].filter(Boolean);
 }
 
 function currentRowValues(tr) {
-  const [brandEl, colorEl, matSel, matCustom, lengthEl, weightEl] = getRowInputs(tr);
+  const [brandEl, colorEl, matSel, matCustom, lengthEl, weightEl, emptySpoolSel] = getRowInputs(tr);
 
   let material = matSel ? matSel.value : "";
   if (material === "Custom") {
@@ -175,12 +225,16 @@ function currentRowValues(tr) {
     material = val || "";
   }
 
+  const emptySpoolValue = emptySpoolSel?.value || "";
+  const emptySpoolId = emptySpoolValue === "" ? null : Number(emptySpoolValue);
+
   return {
     brand: (brandEl?.value || "").trim(),
     color: (colorEl?.value || "").trim(),
     material: (material || "").trim(),
-    length: parseFloat(lengthEl?.value),
+    length: parseFloat(lengthEl?.value) || 0,
     weight: parseFloat(weightEl?.value),
+    emptySpoolId: emptySpoolId,
   };
 }
 
@@ -191,8 +245,9 @@ function hasChanges(tr) {
     now.brand !== orig.brand ||
     now.color !== orig.color ||
     now.material !== orig.material ||
-    (isNaN(now.length) ? "" : now.length) !== (isNaN(orig.length) ? "" : Number(orig.length)) ||
-    (isNaN(now.weight) ? "" : now.weight) !== (isNaN(orig.weight) ? "" : Number(orig.weight))
+    now.length !== (orig.length || 0) ||
+    now.weight !== Number(orig.weight) ||
+    now.emptySpoolId !== orig.emptySpoolId
   );
 }
 
@@ -219,8 +274,8 @@ function onSaveRow(e) {
     alert("Brand, Color, and Material cannot be empty.");
     return;
   }
-  if (isNaN(vals.length) || isNaN(vals.weight)) {
-    alert("Length and Weight must be numbers.");
+  if (isNaN(vals.weight)) {
+    alert("Weight must be a number.");
     return;
   }
 
