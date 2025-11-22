@@ -48,8 +48,8 @@ function showScreen(id) {
   }
   if (id === "analytics") renderAnalytics();
   if (id === "settings") {
-  renderMaterialsList(); // Render materials list when opening settings
-}
+    renderMaterialsList(); // Render materials list when opening settings
+  }
 }
 
 // ----- Material Management Functions -----
@@ -209,18 +209,45 @@ function populateEmptySpoolDropdown() {
   select.value = "";
 }
 
-// ----- Handle "Other" option -----
-document.addEventListener("DOMContentLoaded", () => {
-  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
-  if (emptySpoolSelect) {
-    emptySpoolSelect.addEventListener("change", e => {
-      if (e.target.value === "other") {
-        window.open("emptyspools.html", "_blank"); // open in new tab
-        e.target.value = ""; // reset to none until they refresh
-      }
-    });
+// ----- Handle empty spool selection and calculate filament amount -----
+function handleEmptySpoolSelection() {
+  const select = document.getElementById("emptySpoolSelect");
+  
+  if (select.value === "other") {
+    window.open("emptyspools.html", "_blank");
+    select.value = "";
+    return;
   }
-});
+  
+  calculateFilamentAmount();
+}
+
+function calculateFilamentAmount() {
+  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
+  const fullWeight = parseFloat(document.getElementById("fullSpoolWeight").value) || 0;
+  
+  let emptyWeight = 0;
+  
+  if (emptySpoolSelect.value !== "" && emptySpoolSelect.value !== "other") {
+    const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
+    const selectedSpool = emptySpools[emptySpoolSelect.value];
+    if (selectedSpool) {
+      emptyWeight = selectedSpool.weight;
+    }
+  }
+  
+  const filamentAmount = fullWeight - emptyWeight;
+  
+  const displayDiv = document.getElementById("filamentAmountDisplay");
+  const amountSpan = document.getElementById("filamentAmount");
+  
+  if (fullWeight > 0 && emptyWeight > 0 && filamentAmount > 0) {
+    displayDiv.style.display = "block";
+    amountSpan.textContent = `${filamentAmount.toFixed(2)}g (Full: ${fullWeight.toFixed(2)}g - Empty: ${emptyWeight.toFixed(2)}g)`;
+  } else {
+    displayDiv.style.display = "none";
+  }
+}
 
 // ----- Save Spool -----
 function saveSpool() {
@@ -242,26 +269,56 @@ function saveSpool() {
 
     // Add new custom material if not already present
     if (!materialsList.includes(material)) {
-      materialsList.splice(materialsList.length - 1, 0, material); // before "Custom"
+      materialsList.splice(materialsList.length - 1, 0, material);
       localStorage.setItem("materialsList", JSON.stringify(materialsList));
     }
   }
 
   const lengthInput = document.getElementById("length").value;
-  const length = lengthInput ? parseFloat(lengthInput) : 0; // Length is now optional
-  const weight = parseFloat(document.getElementById("weight").value);
-
-  // Only require brand, color, material, and weight - length is optional
-  if (!brand || !color || !material || isNaN(weight)) {
-    alert("Please fill out Brand, Color, Material, and Weight fields.");
-    return;
-  }
+  const length = lengthInput ? parseFloat(lengthInput) : 0;
+  
+  const fullSpoolWeight = parseFloat(document.getElementById("fullSpoolWeight").value);
 
   // Get empty spool reference if selected
   const emptySpoolSelect = document.getElementById("emptySpoolSelect");
-  let emptySpoolId = emptySpoolSelect.value === "" ? null : Number(emptySpoolSelect.value);
+  let emptySpoolId = emptySpoolSelect.value === "" || emptySpoolSelect.value === "other" 
+    ? null 
+    : Number(emptySpoolSelect.value);
+  
+  // Get empty weight
+  let emptyWeight = 0;
+  if (emptySpoolId !== null) {
+    const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
+    const selectedSpool = emptySpools[emptySpoolId];
+    if (selectedSpool) {
+      emptyWeight = selectedSpool.weight;
+    }
+  }
+  
+  // Calculate actual filament weight
+  const weight = fullSpoolWeight - emptyWeight;
 
-  spoolLibrary.push({ brand, color, material, length, weight, emptySpoolId });
+  // Validation
+  if (!brand || !color || !material || isNaN(fullSpoolWeight)) {
+    alert("Please fill out Brand, Color, Material, and Full Spool Weight fields.");
+    return;
+  }
+  
+  if (emptySpoolId !== null && weight <= 0) {
+    alert("Full spool weight must be greater than empty spool weight.");
+    return;
+  }
+
+  spoolLibrary.push({ 
+    brand, 
+    color, 
+    material, 
+    length, 
+    weight: emptySpoolId !== null ? weight : fullSpoolWeight,  // If no empty spool, use full weight
+    emptyWeight: emptySpoolId !== null ? emptyWeight : 0,
+    fullSpoolWeight,
+    emptySpoolId 
+  });
   localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
 
   // Reset form
@@ -269,10 +326,12 @@ function saveSpool() {
   document.getElementById("color").value = "";
   populateMaterialDropdown();
   document.getElementById("length").value = "";
-  document.getElementById("weight").value = "";
+  document.getElementById("fullSpoolWeight").value = "";
+  document.getElementById("filamentAmountDisplay").style.display = "none";
   populateEmptySpoolDropdown();
 
-  alert("Spool saved!");
+  const savedWeight = emptySpoolId !== null ? weight.toFixed(2) : fullSpoolWeight.toFixed(2);
+  alert(`Spool saved! ${emptySpoolId !== null ? 'Filament amount: ' : 'Weight: '}${savedWeight}g`);
   showScreen("library");
 }
 
@@ -766,7 +825,8 @@ function failedPrintJob() {
     jobId: activePrintJob.jobId,
     jobName: `FAILED: ${activePrintJob.jobName}`,
     spools: updatedSpools,
-    startTime: activePrintJob.startTime,
+    startTime: activePrintJob.start
+      Time,
     endTime: new Date().toISOString(),
     status: "failed"
   });
@@ -899,3 +959,4 @@ function resetHistoryPagination() {
 }
 
 window.showScreen = showScreen;
+    
