@@ -209,17 +209,24 @@ function populateEmptySpoolDropdown() {
   select.value = "";
 }
 
-// ----- Handle "Other" option -----
 document.addEventListener("DOMContentLoaded", () => {
-  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
-  if (emptySpoolSelect) {
-    emptySpoolSelect.addEventListener("change", e => {
-      if (e.target.value === "other") {
-        window.open("emptyspools.html", "_blank"); // open in new tab
-        e.target.value = ""; // reset to none until they refresh
+  const checkUpdatesBtn = document.getElementById("checkUpdatesBtn");
+  if (checkUpdatesBtn) {
+    checkUpdatesBtn.addEventListener("click", () => {
+      if (!newWorker) {
+        alert("No update available at this time.");
+      } else {
+        showUpdatePrompt(() => {
+          newWorker.postMessage({ action: "skipWaiting" });
+        });
       }
     });
   }
+
+  // Initialize by showing home screen and populating material dropdown
+  showScreen("home");
+  populateMaterialDropdown();
+  loadBranding(); // NEW LINE - Load branding when page loads
 });
 
 // ----- Save Spool -----
