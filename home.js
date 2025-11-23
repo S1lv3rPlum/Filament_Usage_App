@@ -238,6 +238,19 @@ function calculateFilamentAmount() {
   }
 }
 
+// ----- Handle Color Type Change -----
+function handleColorTypeChange() {
+  const colorType = document.getElementById("colorType").value;
+  const gradientInput = document.getElementById("gradientColors");
+  
+  if (colorType === "gradient") {
+    gradientInput.classList.remove("hidden");
+  } else {
+    gradientInput.classList.add("hidden");
+    gradientInput.value = "";
+  }
+}
+
 // ----- Save Spool -----
 function saveSpool() {
   const brand = document.getElementById("brand").value.trim();
@@ -267,6 +280,7 @@ function saveSpool() {
   
   const fullSpoolWeight = parseFloat(document.getElementById("fullSpoolWeight").value);
 
+  // Get empty spool reference if selected
   const emptySpoolSelect = document.getElementById("emptySpoolSelect");
   let emptySpoolId = emptySpoolSelect.value === "" || emptySpoolSelect.value === "other" 
     ? null 
@@ -283,6 +297,14 @@ function saveSpool() {
   
   const weight = fullSpoolWeight - emptyWeight;
 
+  // NEW: Get color details
+  const colorType = document.getElementById("colorType").value;
+  const gradientColors = document.getElementById("gradientColors").value.trim();
+  const sheen = document.getElementById("sheen").value;
+  const glowInDark = document.getElementById("glowInDark").checked;
+  const texture = document.getElementById("texture").value;
+
+  // Validation
   if (!brand || !color || !material || isNaN(fullSpoolWeight)) {
     alert("Please fill out Brand, Color, Material, and Full Spool Weight fields.");
     return;
@@ -290,6 +312,11 @@ function saveSpool() {
   
   if (emptySpoolId !== null && weight <= 0) {
     alert("Full spool weight must be greater than empty spool weight.");
+    return;
+  }
+
+  if (colorType === "gradient" && !gradientColors) {
+    alert("Please enter the gradient colors.");
     return;
   }
 
@@ -301,10 +328,17 @@ function saveSpool() {
     weight: emptySpoolId !== null ? weight : fullSpoolWeight,
     emptyWeight: emptySpoolId !== null ? emptyWeight : 0,
     fullSpoolWeight,
-    emptySpoolId 
+    emptySpoolId,
+    // NEW: Color details
+    colorType,
+    gradientColors: colorType === "gradient" ? gradientColors : "",
+    sheen,
+    glowInDark,
+    texture
   });
   localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
 
+  // Reset form
   document.getElementById("brand").value = "";
   document.getElementById("color").value = "";
   populateMaterialDropdown();
@@ -312,6 +346,13 @@ function saveSpool() {
   document.getElementById("fullSpoolWeight").value = "";
   document.getElementById("filamentAmountDisplay").style.display = "none";
   populateEmptySpoolDropdown();
+  // Reset color details
+  document.getElementById("colorType").value = "solid";
+  document.getElementById("gradientColors").value = "";
+  document.getElementById("gradientColors").classList.add("hidden");
+  document.getElementById("sheen").value = "";
+  document.getElementById("glowInDark").checked = false;
+  document.getElementById("texture").value = "";
 
   const savedWeight = emptySpoolId !== null ? weight.toFixed(2) : fullSpoolWeight.toFixed(2);
   alert(`Spool saved! ${emptySpoolId !== null ? 'Filament amount: ' : 'Weight: '}${savedWeight}g`);

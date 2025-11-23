@@ -36,6 +36,31 @@ function getEmptySpoolLabel(emptySpoolId) {
   return "";
 }
 
+// Helper to format color details for display
+function formatColorDetails(spool) {
+  const details = [];
+  
+  if (spool.colorType === "gradient" && spool.gradientColors) {
+    details.push(`Gradient: ${spool.gradientColors}`);
+  } else if (spool.colorType) {
+    details.push(`Type: ${spool.colorType}`);
+  }
+  
+  if (spool.sheen) {
+    details.push(`Sheen: ${spool.sheen}`);
+  }
+  
+  if (spool.glowInDark) {
+    details.push("Glow in Dark");
+  }
+  
+  if (spool.texture) {
+    details.push(`Texture: ${spool.texture}`);
+  }
+  
+  return details.length > 0 ? details.join(", ") : "—";
+}
+
 // ----- Inventory table rendering & inline editing -----
 function renderInventoryTable() {
   const tbody = document.querySelector("#inventoryTable tbody");
@@ -44,7 +69,7 @@ function renderInventoryTable() {
   if (spoolLibrary.length === 0) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 7;
+    td.colSpan = 8;
     td.textContent = "No spools in inventory";
     tr.appendChild(td);
     tbody.appendChild(tr);
@@ -59,15 +84,15 @@ function renderInventoryTable() {
       ? getEmptySpoolLabel(spool.emptySpoolId) 
       : "None";
 
-    // Display the CALCULATED filament weight (weight field)
-    let weightDisplay = `${Number(spool.weight).toFixed(2)}g`;
-    
+    const colorDetails = formatColorDetails(spool);
+
     tr.innerHTML = `
    <td class="cell-brand"><span>${escapeHtml(spool.brand)}</span></td>
    <td class="cell-color"><span>${escapeHtml(spool.color)}</span></td>
    <td class="cell-material"><span>${escapeHtml(spool.material)}</span></td>
    <td class="cell-length"><span>${spool.length > 0 ? Number(spool.length).toFixed(2) : 'N/A'}</span></td>
-   <td class="cell-weight"><span>${weightDisplay}</span></td>
+   <td class="cell-weight"><span>${Number(spool.weight).toFixed(2)}</span></td>
+   <td class="cell-color-details"><span style="font-size: 0.85em;">${colorDetails}</span></td>
    <td class="cell-empty"><span>${emptySpoolDisplay}</span></td>
    <td class="cell-actions">
      <button class="edit-btn">Edit</button>
@@ -134,13 +159,11 @@ function buildEmptySpoolSelectForRow(currentValue) {
   const sel = document.createElement("select");
   sel.className = "row-empty-spool-select";
 
-  // None option
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
   noneOpt.textContent = "None";
   sel.appendChild(noneOpt);
 
-  // Existing empty spools
   emptySpools.forEach((spool, idx) => {
     const opt = document.createElement("option");
     opt.value = idx;
@@ -148,10 +171,113 @@ function buildEmptySpoolSelectForRow(currentValue) {
     sel.appendChild(opt);
   });
 
-  // Set current value
   sel.value = currentValue !== null && currentValue !== undefined ? currentValue : "";
 
   return sel;
+}
+
+function buildColorDetailsEditFields(spool) {
+  const wrapper = document.createElement("div");
+  wrapper.style.fontSize = "0.85em";
+  
+  // Color Type
+  const typeLabel = document.createElement("label");
+  typeLabel.textContent = "Type:";
+  typeLabel.style.display = "block";
+  typeLabel.style.marginBottom = "3px";
+  
+  const typeSelect = document.createElement("select");
+  typeSelect.className = "row-color-type";
+  typeSelect.style.width = "100%";
+  typeSelect.style.padding = "4px";
+  typeSelect.style.marginBottom = "5px";
+  ["solid", "gradient"].forEach(val => {
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = val.charAt(0).toUpperCase() + val.slice(1);
+    typeSelect.appendChild(opt);
+  });
+  typeSelect.value = spool.colorType || "solid";
+  
+  // Gradient Colors
+  const gradientInput = document.createElement("input");
+  gradientInput.type = "text";
+  gradientInput.className = "row-gradient-colors";
+  gradientInput.placeholder = "Gradient colors";
+  gradientInput.value = spool.gradientColors || "";
+  gradientInput.style.width = "100%";
+  gradientInput.style.padding = "4px";
+  gradientInput.style.marginBottom = "5px";
+  gradientInput.style.display = spool.colorType === "gradient" ? "block" : "none";
+  
+  typeSelect.addEventListener("change", () => {
+    gradientInput.style.display = typeSelect.value === "gradient" ? "block" : "none";
+  });
+  
+  // Sheen
+  const sheenLabel = document.createElement("label");
+  sheenLabel.textContent = "Sheen:";
+  sheenLabel.style.display = "block";
+  sheenLabel.style.marginTop = "5px";
+  sheenLabel.style.marginBottom = "3px";
+  
+  const sheenSelect = document.createElement("select");
+  sheenSelect.className = "row-sheen";
+  sheenSelect.style.width = "100%";
+  sheenSelect.style.padding = "4px";
+  sheenSelect.style.marginBottom = "5px";
+  ["", "matte", "glossy", "silk", "glitter", "metallic", "satin"].forEach(val => {
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = val ? val.charAt(0).toUpperCase() + val.slice(1) : "—";
+    sheenSelect.appendChild(opt);
+  });
+  sheenSelect.value = spool.sheen || "";
+  
+  // Glow in Dark
+  const glowLabel = document.createElement("label");
+  glowLabel.style.display = "block";
+  glowLabel.style.marginTop = "5px";
+  
+  const glowCheckbox = document.createElement("input");
+  glowCheckbox.type = "checkbox";
+  glowCheckbox.className = "row-glow";
+  glowCheckbox.checked = spool.glowInDark || false;
+  glowCheckbox.style.width = "auto";
+  glowCheckbox.style.marginRight = "5px";
+  
+  glowLabel.appendChild(glowCheckbox);
+  glowLabel.appendChild(document.createTextNode("Glow"));
+  
+  // Texture
+  const textureLabel = document.createElement("label");
+  textureLabel.textContent = "Texture:";
+  textureLabel.style.display = "block";
+  textureLabel.style.marginTop = "5px";
+  textureLabel.style.marginBottom = "3px";
+  
+  const textureSelect = document.createElement("select");
+  textureSelect.className = "row-texture";
+  textureSelect.style.width = "100%";
+  textureSelect.style.padding = "4px";
+  ["", "smooth", "textured", "wood-grain", "marble", "carbon-fiber", "fuzzy"].forEach(val => {
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = val ? val.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "—";
+    textureSelect.appendChild(opt);
+  });
+  textureSelect.value = spool.texture || "";
+  
+  wrapper.appendChild(typeLabel);
+  wrapper.appendChild(typeSelect);
+  wrapper.appendChild(gradientInput);
+  wrapper.appendChild(sheenLabel);
+  wrapper.appendChild(sheenSelect);
+  wrapper.appendChild(glowLabel);
+  wrapper.appendChild(textureLabel);
+  wrapper.appendChild(textureSelect);
+  
+  return wrapper;
 }
 
 function enterEditMode(tr) {
@@ -170,11 +296,12 @@ function enterEditMode(tr) {
 
   tr.querySelector(".cell-length").innerHTML =
     `<input type="number" step="0.01" class="row-length" value="${Number(data.length) || 0}" />`;
-  
-  // Edit the FILAMENT weight (current calculated weight)
   tr.querySelector(".cell-weight").innerHTML =
-    `<input type="number" step="0.01" class="row-weight" value="${Number(data.weight)}" />
-     <small style="display:block; color:#666; margin-top:3px;">Filament weight (current)</small>`;
+    `<input type="number" step="0.01" class="row-weight" value="${Number(data.weight)}" />`;
+
+  const colorDetailsCell = tr.querySelector(".cell-color-details");
+  colorDetailsCell.innerHTML = "";
+  colorDetailsCell.appendChild(buildColorDetailsEditFields(data));
 
   const emptySpoolCell = tr.querySelector(".cell-empty");
   emptySpoolCell.innerHTML = "";
@@ -196,13 +323,14 @@ function exitEditMode(tr, useLatest = true) {
     ? getEmptySpoolLabel(data.emptySpoolId) 
     : "None";
 
-  let weightDisplay = `${Number(data.weight).toFixed(2)}g`;
+  const colorDetails = formatColorDetails(data);
 
   tr.querySelector(".cell-brand").innerHTML = `<span>${escapeHtml(data.brand)}</span>`;
   tr.querySelector(".cell-color").innerHTML = `<span>${escapeHtml(data.color)}</span>`;
   tr.querySelector(".cell-material").innerHTML = `<span>${escapeHtml(data.material)}</span>`;
   tr.querySelector(".cell-length").innerHTML = `<span>${data.length > 0 ? Number(data.length).toFixed(2) : 'N/A'}</span>`;
-  tr.querySelector(".cell-weight").innerHTML = `<span>${weightDisplay}</span>`;
+  tr.querySelector(".cell-weight").innerHTML = `<span>${Number(data.weight).toFixed(2)}</span>`;
+  tr.querySelector(".cell-color-details").innerHTML = `<span style="font-size: 0.85em;">${colorDetails}</span>`;
   tr.querySelector(".cell-empty").innerHTML = `<span>${emptySpoolDisplay}</span>`;
 
   tr.querySelector(".edit-btn").classList.remove("hidden");
@@ -220,12 +348,17 @@ function getRowInputs(tr) {
     tr.querySelector(".row-custom-material-input"),
     tr.querySelector(".row-length"),
     tr.querySelector(".row-weight"),
+    tr.querySelector(".row-color-type"),
+    tr.querySelector(".row-gradient-colors"),
+    tr.querySelector(".row-sheen"),
+    tr.querySelector(".row-glow"),
+    tr.querySelector(".row-texture"),
     tr.querySelector(".row-empty-spool-select"),
   ].filter(Boolean);
 }
 
 function currentRowValues(tr) {
-  const [brandEl, colorEl, matSel, matCustom, lengthEl, weightEl, emptySpoolSel] = getRowInputs(tr);
+  const [brandEl, colorEl, matSel, matCustom, lengthEl, weightEl, colorTypeEl, gradientEl, sheenEl, glowEl, textureEl, emptySpoolSel] = getRowInputs(tr);
 
   let material = matSel ? matSel.value : "";
   if (material === "Custom") {
@@ -242,6 +375,11 @@ function currentRowValues(tr) {
     material: (material || "").trim(),
     length: parseFloat(lengthEl?.value) || 0,
     weight: parseFloat(weightEl?.value),
+    colorType: colorTypeEl?.value || "solid",
+    gradientColors: gradientEl?.value?.trim() || "",
+    sheen: sheenEl?.value || "",
+    glowInDark: glowEl?.checked || false,
+    texture: textureEl?.value || "",
     emptySpoolId: emptySpoolId,
   };
 }
@@ -255,6 +393,11 @@ function hasChanges(tr) {
     now.material !== orig.material ||
     now.length !== (orig.length || 0) ||
     now.weight !== Number(orig.weight) ||
+    now.colorType !== (orig.colorType || "solid") ||
+    now.gradientColors !== (orig.gradientColors || "") ||
+    now.sheen !== (orig.sheen || "") ||
+    now.glowInDark !== (orig.glowInDark || false) ||
+    now.texture !== (orig.texture || "") ||
     now.emptySpoolId !== orig.emptySpoolId
   );
 }
