@@ -47,8 +47,8 @@ function showScreen(id) {
     populateEmptySpoolDropdown();
   }
   if (id === "analytics") renderAnalytics();
-  if (id === "settings") {
-    renderMaterialsList();
+  if (id === "materials") {
+    renderMaterialsList(); // Render materials list when opening materials screen
   }
 }
 
@@ -93,6 +93,38 @@ function renderMaterialsList() {
     
     list.appendChild(li);
   });
+}
+
+// ----- Branding Functions -----
+function saveBranding() {
+  const companyName = document.getElementById("companyName").value.trim();
+  localStorage.setItem("companyName", companyName);
+  
+  // Update the display immediately
+  loadBranding();
+  
+  alert("Branding saved!");
+}
+
+function loadBranding() {
+  const companyName = localStorage.getItem("companyName") || "";
+  const display = document.getElementById("companyNameDisplay");
+  const input = document.getElementById("companyName");
+  
+  // Update header display
+  if (display) {
+    if (companyName) {
+      display.textContent = companyName;
+      display.style.display = "block";
+    } else {
+      display.style.display = "none";
+    }
+  }
+  
+  // Update input field if on settings page
+  if (input) {
+    input.value = companyName;
+  }
 }
 
 function addNewMaterial() {
@@ -301,7 +333,7 @@ function saveSpool() {
   const colorType = document.getElementById("colorType").value;
   const gradientColors = document.getElementById("gradientColors").value.trim();
   const sheen = document.getElementById("sheen").value;
-  const glowInDark = document.getElementById("glowInDark").checked;
+  const glowInDark = document.querySelector('input[name="glowInDark"]:checked').value;
   const texture = document.getElementById("texture").value;
 
   // Validation
@@ -588,6 +620,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showScreen("home");
   populateMaterialDropdown();
+  loadBranding(); // NEW LINE - Load branding when page loads
 });
 
 function populateSpoolMultiSelect() {

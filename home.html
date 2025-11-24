@@ -11,16 +11,18 @@
 </head>
 <body>
   <header>
-    <h1>Filament Foundry</h1>
-    <p style="font-size: 0.85em; margin-top: 5px; opacity: 0.9;">by DataForge</p>
-  </header>
+  <h1>Filament Foundry</h1>
+  <p id="companyNameDisplay" style="font-size: 1em; margin-top: 5px; opacity: 0.95; font-weight: 600;"></p>
+  <p style="font-size: 0.85em; margin-top: 5px; opacity: 0.9;">by DataForge</p>
+</header>
 
 <main id="home">
+  <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
   <button onclick="showScreen('addSpool')">➕ Add New Spool</button>
   <button onclick="window.location.href='inventory.html'">📦 View Inventory</button>
+  <button onclick="showScreen('materials')">📋 Manage Materials</button>
   <button onclick="window.location.href='emptyspools.html'">🧵 Empty Spool Weights</button>
   <button onclick="showScreen('history')">📜 Usage History</button>
-  <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
   <button onclick="showScreen('analytics')">📊 Analytics</button>
   <button onclick="showScreen('settings')">⚙️ Settings</button>
 </main>
@@ -74,10 +76,17 @@
       <option value="satin">Satin</option>
     </select>
     
-    <label style="display: block; margin-top: 15px;">
-      <input type="checkbox" id="glowInDark" style="width: auto; margin-right: 8px;" />
-      <strong>Glow in the Dark</strong>
-    </label>
+    <label for="glowInDark" style="display: block; margin-top: 10px; font-weight: bold;">Glow in the Dark:</label>
+<div style="display: flex; justify-content: center; gap: 20px; margin-top: 5px;">
+  <label style="display: flex; align-items: center; cursor: pointer;">
+    <input type="radio" name="glowInDark" value="no" checked style="margin-right: 5px;" />
+    No
+  </label>
+  <label style="display: flex; align-items: center; cursor: pointer;">
+    <input type="radio" name="glowInDark" value="yes" style="margin-right: 5px;" />
+    Yes
+  </label>
+</div>
     
     <label for="texture" style="display: block; margin-top: 10px; font-weight: bold;">Texture:</label>
     <select id="texture" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
@@ -197,19 +206,38 @@
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
 
-<!-- Settings Screen -->
-<section id="settings" class="hidden">
-  <h2>Settings</h2>
+<!-- Materials Management Screen -->
+<section id="materials" class="hidden">
+  <h2>Manage Material Types</h2>
   
-  <!-- Material Management -->
   <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
-    <h3>Manage Material Types</h3>
     <ul id="materialsList" style="list-style: none; padding: 0;"></ul>
     
     <div style="margin-top: 15px;">
       <input id="newMaterialInput" placeholder="Add new material type" style="width: 70%; display: inline-block;" />
       <button onclick="addNewMaterial()" style="width: 25%; display: inline-block; margin-left: 3%;">Add</button>
     </div>
+  </div>
+  
+  <button onclick="showScreen('home')">⬅ Back</button>
+</section>
+
+<!-- Settings Screen -->
+<section id="settings" class="hidden">
+  <h2>Settings</h2>
+  
+  <!-- Company Branding -->
+  <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
+    <h3>Company Branding</h3>
+    <label for="companyName" style="display: block; margin-top: 10px; font-weight: bold;">Your Company Name (Optional):</label>
+    <input 
+      id="companyName" 
+      type="text" 
+      placeholder="e.g., Acme 3D Printing Co." 
+      style="width: 100%; padding: 10px; margin-top: 5px; font-size: 1em;"
+    />
+    <small style="color: #666; display: block; margin-top: 5px;">This will appear below "Filament Foundry" in the header</small>
+    <button onclick="saveBranding()" style="margin-top: 10px;">Save Branding</button>
   </div>
   
   <button id="checkUpdatesBtn">Check for Updates</button>
