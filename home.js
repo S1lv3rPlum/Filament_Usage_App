@@ -235,7 +235,7 @@ function handleEmptySpoolSelection() {
   const select = document.getElementById("emptySpoolSelect");
   
   if (select.value === "other") {
-    window.open("emptyspools.html", "_blank");
+    openEmptySpoolModal(); // Open modal instead of new tab
     select.value = "";
     return;
   }
@@ -270,16 +270,20 @@ function calculateFilamentAmount() {
   }
 }
 
+
+
 // ----- Handle Color Type Change -----
 function handleColorTypeChange() {
   const colorType = document.getElementById("colorType").value;
-  const gradientInput = document.getElementById("gradientColors");
+  const solidFields = document.getElementById("solidColorFields");
+  const gradientFields = document.getElementById("gradientColorFields");
   
   if (colorType === "gradient") {
-    gradientInput.classList.remove("hidden");
+    solidFields.classList.add("hidden");
+    gradientFields.classList.remove("hidden");
   } else {
-    gradientInput.classList.add("hidden");
-    gradientInput.value = "";
+    solidFields.classList.remove("hidden");
+    gradientFields.classList.add("hidden");
   }
 }
 
@@ -329,9 +333,19 @@ function saveSpool() {
   
   const weight = fullSpoolWeight - emptyWeight;
 
-  // NEW: Get color details
+// Get color details
   const colorType = document.getElementById("colorType").value;
-  const gradientColors = document.getElementById("gradientColors").value.trim();
+  let baseColor = "";
+  let gradientBaseColors = [];
+  
+  if (colorType === "solid") {
+    baseColor = document.getElementById("baseColorSolid").value;
+  } else {
+    // Get checked gradient colors
+    const checkedBoxes = document.querySelectorAll('input[name="gradientColors"]:checked');
+    gradientBaseColors = Array.from(checkedBoxes).map(cb => cb.value);
+  }
+  
   const sheen = document.getElementById("sheen").value;
   const glowInDark = document.querySelector('input[name="glowInDark"]:checked').value;
   const texture = document.getElementById("texture").value;
@@ -347,12 +361,22 @@ function saveSpool() {
     return;
   }
 
-  if (colorType === "gradient" && !gradientColors) {
-    alert("Please enter the gradient colors.");
+if (colorType === "solid" && !baseColor) {
+    alert("Please select a base color.");
+    return;
+  }
+  
+  if (colorType === "gradient" && gradientBaseColors.length === 0) {
+    alert("Please select at least one base color for the gradient.");
+    return;
+  }
+  
+  if (colorType === "gradient" && gradientBaseColors.length > 3) {
+    alert("Please select up to 3 base colors for the gradient.");
     return;
   }
 
-  spoolLibrary.push({ 
+spoolLibrary.push({ 
     brand, 
     color, 
     material, 
@@ -361,9 +385,10 @@ function saveSpool() {
     emptyWeight: emptySpoolId !== null ? emptyWeight : 0,
     fullSpoolWeight,
     emptySpoolId,
-    // NEW: Color details
+    // Color details
     colorType,
-    gradientColors: colorType === "gradient" ? gradientColors : "",
+    baseColor: colorType === "solid" ? baseColor : "",
+    gradientBaseColors: colorType === "gradient" ? gradientBaseColors : [],
     sheen,
     glowInDark,
     texture
@@ -380,10 +405,11 @@ function saveSpool() {
   populateEmptySpoolDropdown();
   // Reset color details
   document.getElementById("colorType").value = "solid";
-  document.getElementById("gradientColors").value = "";
-  document.getElementById("gradientColors").classList.add("hidden");
+  document.getElementById("baseColorSolid").value = "";
+  document.querySelectorAll('input[name="gradientColors"]').forEach(cb => cb.checked = false);
+  handleColorTypeChange(); // Reset visibility
   document.getElementById("sheen").value = "";
-  document.getElementById("glowInDark").checked = false;
+  document.querySelector('input[name="glowInDark"][value="no"]').checked = true;
   document.getElementById("texture").value = "";
 
   const savedWeight = emptySpoolId !== null ? weight.toFixed(2) : fullSpoolWeight.toFixed(2);
@@ -409,7 +435,15 @@ function renderLibrary() {
       weightDisplay = `${spool.weight.toFixed(2)}g filament (Full: ${spool.fullSpoolWeight.toFixed(2)}g - Empty: ${spool.emptyWeight.toFixed(2)}g)`;
     }
     
-    li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${lengthDisplay}${weightDisplay})`;
+    // Build color display
+    let colorDisplay = spool.color;
+    if (spool.colorType === "solid" && spool.baseColor) {
+      colorDisplay += ` - [${spool.baseColor}]`;
+    } else if (spool.colorType === "gradient" && spool.gradientBaseColors && spool.gradientBaseColors.length > 0) {
+      colorDisplay += ` - [${spool.gradientBaseColors.join(", ")}]`;
+    }
+    
+    li.textContent = `${spool.brand} - ${colorDisplay} - ${spool.material} (${lengthDisplay}${weightDisplay})`;
     list.appendChild(li);
   });
 }
@@ -933,5 +967,120 @@ function resetHistoryPagination() {
   historyPage = 0;
 }
 
-window.showScreen = showScreen;
+// ----- Empty Spool Modal Functions -----
+function openEmptySpoolModal() {
+  const modal = document.getElementById("emptySpoolModal");
+  const modalBody = document.getElementById("emptySpoolModalBody");
   
+  // Load the empty spool interface
+  modalBody.innerHTML = `
+    <div style="margin-bottom: 20px;">
+      <input id="modalEmptyBrand" placeholder="Brand" style="width: 100%; padding: 10px; margin-bottom: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+      <input id="modalEmptyPackage" placeholder="Package Type (e.g., 1kg, 500g)" style="width: 100%; padding: 10px; margin-bottom: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+      <input id="modalEmptyWeight" type="number" step="0.01" placeholder="Empty Spool Weight (g)" style="width: 100%; padding: 10px; margin-bottom: 15px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+      <button onclick="saveEmptySpoolFromModal()" style="width: 100%; padding: 12px; background: #007acc; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">Save Empty Spool</button>
+    </div>
+    
+    <h3 style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">Existing Empty Spools</h3>
+    <ul id="modalEmptySpoolList" style="list-style: none; padding: 0;"></ul>
+  `;
+  
+  // Render existing empty spools
+  renderModalEmptySpoolList();
+  
+  modal.style.display = "block";
+}
+
+function closeEmptySpoolModal() {
+  const modal = document.getElementById("emptySpoolModal");
+  modal.style.display = "none";
+  
+  // Refresh the dropdown in Add Spool form
+  populateEmptySpoolDropdown();
+}
+
+function saveEmptySpoolFromModal() {
+  const brand = document.getElementById("modalEmptyBrand").value.trim();
+  const packageType = document.getElementById("modalEmptyPackage").value.trim();
+  const weight = parseFloat(document.getElementById("modalEmptyWeight").value);
+  
+  if (!brand || !packageType || isNaN(weight)) {
+    alert("Please fill out all fields.");
+    return;
+  }
+  
+  emptySpoolsLibrary.push({ brand: brand, package: packageType, weight: weight });
+  saveEmptySpoolsLibrary();
+  
+  // Clear inputs
+  document.getElementById("modalEmptyBrand").value = "";
+  document.getElementById("modalEmptyPackage").value = "";
+  document.getElementById("modalEmptyWeight").value = "";
+  
+  // Re-render list
+  renderModalEmptySpoolList();
+  
+  alert("Empty spool saved!");
+}
+
+function renderModalEmptySpoolList() {
+  const list = document.getElementById("modalEmptySpoolList");
+  if (!list) return;
+  
+  list.innerHTML = "";
+  
+  if (emptySpoolsLibrary.length === 0) {
+    list.innerHTML = "<li style='padding: 10px; color: #666;'>No empty spools saved yet.</li>";
+    return;
+  }
+  
+  emptySpoolsLibrary.forEach((spool, index) => {
+    const li = document.createElement("li");
+    li.style.padding = "10px";
+    li.style.marginBottom = "8px";
+    li.style.background = "#f0f4f8";
+    li.style.borderRadius = "6px";
+    li.style.display = "flex";
+    li.style.justifyContent = "space-between";
+    li.style.alignItems = "center";
+    
+    const span = document.createElement("span");
+    span.textContent = `${spool.brand} – ${spool.package} (${spool.weight}g)`;
+    
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "Delete";
+    deleteBtn.style.padding = "6px 12px";
+    deleteBtn.style.background = "#ff6b6b";
+    deleteBtn.style.color = "white";
+    deleteBtn.style.border = "none";
+    deleteBtn.style.borderRadius = "4px";
+    deleteBtn.style.cursor = "pointer";
+    deleteBtn.onclick = () => deleteEmptySpoolFromModal(index);
+    
+    li.appendChild(span);
+    li.appendChild(deleteBtn);
+    list.appendChild(li);
+  });
+}
+
+function deleteEmptySpoolFromModal(index) {
+  if (confirm("Delete this empty spool?")) {
+    emptySpoolsLibrary.splice(index, 1);
+    saveEmptySpoolsLibrary();
+    renderModalEmptySpoolList();
+  }
+}
+
+function saveEmptySpoolsLibrary() {
+  localStorage.setItem("emptySpools", JSON.stringify(emptySpoolsLibrary));
+}
+
+// Close modal when clicking outside of it
+window.addEventListener("click", (e) => {
+  const modal = document.getElementById("emptySpoolModal");
+  if (e.target === modal) {
+    closeEmptySpoolModal();
+  }
+});
+
+window.showScreen = showScreen;
