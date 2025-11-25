@@ -10,25 +10,28 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-<header>
+  <header>
   <h1>Filament Foundry</h1>
+  <p id="companyNameDisplay" style="font-size: 1em; margin-top: 5px; opacity: 0.95; font-weight: 600;"></p>
   <p style="font-size: 0.85em; margin-top: 5px; opacity: 0.9;">by DataForge</p>
 </header>
 
 <main id="home">
+  <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
   <button onclick="showScreen('addSpool')">➕ Add New Spool</button>
   <button onclick="window.location.href='inventory.html'">📦 View Inventory</button>
+  <button onclick="showScreen('materials')">📋 Manage Materials</button>
   <button onclick="window.location.href='emptyspools.html'">🧵 Empty Spool Weights</button>
   <button onclick="showScreen('history')">📜 Usage History</button>
-  <button onclick="showScreen('tracking')">🎯 Start Tracking</button>
   <button onclick="showScreen('analytics')">📊 Analytics</button>
   <button onclick="showScreen('settings')">⚙️ Settings</button>
 </main>
 
 <section id="addSpool" class="hidden">
   <h2>Add New Spool</h2>
+  
   <input id="brand" placeholder="Brand" />
-  <input id="color" placeholder="Color" />
+  <input id="color" placeholder="Color Name" />
   
   <select id="materialSelect" onchange="handleMaterialChange()" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; margin-bottom: 10px;">
     <!-- Options inserted dynamically -->
@@ -43,13 +46,190 @@
   />
   
   <input id="length" type="number" placeholder="Length (m) - Optional" />
-  <input id="weight" type="number" placeholder="Weight (g)" />
-  <label for="emptySpoolSelect">Empty Spool:</label>
-  <select id="emptySpoolSelect"></select>
+
+ <!-- Color Details Section -->
+<div style="background: #f0f4f8; padding: 15px; border-radius: 8px; margin: 15px 0;">
+  <h3 style="margin-top: 0; font-size: 1.1em;">Color Details</h3>
+  
+  <label for="colorType" style="display: block; margin-top: 10px; font-weight: bold;">Color Type:</label>
+  <select id="colorType" onchange="handleColorTypeChange()" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+    <option value="solid">Solid</option>
+    <option value="gradient">Gradient</option>
+  </select>
+  
+  <!-- Solid Color Fields -->
+  <div id="solidColorFields" style="margin-top: 10px;">
+    <label for="baseColorSolid" style="display: block; margin-top: 10px; font-weight: bold;">Base Color:</label>
+    <select id="baseColorSolid" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+      <option value="">Select...</option>
+      <option value="Red">Red</option>
+      <option value="Orange">Orange</option>
+      <option value="Yellow">Yellow</option>
+      <option value="Green">Green</option>
+      <option value="Blue">Blue</option>
+      <option value="Purple">Purple</option>
+      <option value="Pink">Pink</option>
+      <option value="Brown">Brown</option>
+      <option value="Black">Black</option>
+      <option value="White">White</option>
+      <option value="Gray">Gray</option>
+      <option value="Clear/Natural">Clear/Natural</option>
+      <option value="Multicolor">Multicolor</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+  
+  <!-- Gradient Color Fields -->
+  <div id="gradientColorFields" class="hidden" style="margin-top: 10px;">
+    <label style="display: block; margin-top: 10px; font-weight: bold;">Base Colors in Gradient (select up to 3):</label>
+    <div class="checkbox-table">
+  <div class="checkbox-row">
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Red" style="margin-right: 8px;" />
+        <span>Red</span>
+      </label>
+    </div>
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Orange" style="margin-right: 8px;" />
+        <span>Orange</span>
+      </label>
+    </div>
+  </div>
+  <div class="checkbox-row">
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Yellow" style="margin-right: 8px;" />
+        <span>Yellow</span>
+      </label>
+    </div>
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Green" style="margin-right: 8px;" />
+        <span>Green</span>
+      </label>
+    </div>
+  </div>
+  <div class="checkbox-row">
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Blue" style="margin-right: 8px;" />
+        <span>Blue</span>
+      </label>
+    </div>
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Purple" style="margin-right: 8px;" />
+        <span>Purple</span>
+      </label>
+    </div>
+  </div>
+  <div class="checkbox-row">
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Pink" style="margin-right: 8px;" />
+        <span>Pink</span>
+      </label>
+    </div>
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Brown" style="margin-right: 8px;" />
+        <span>Brown</span>
+      </label>
+    </div>
+  </div>
+  <div class="checkbox-row">
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Black" style="margin-right: 8px;" />
+        <span>Black</span>
+      </label>
+    </div>
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="White" style="margin-right: 8px;" />
+        <span>White</span>
+      </label>
+    </div>
+  </div>
+  <div class="checkbox-row">
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Gray" style="margin-right: 8px;" />
+        <span>Gray</span>
+      </label>
+    </div>
+    <div class="checkbox-cell">
+      <label class="checkbox-label">
+        <input type="checkbox" name="gradientColors" value="Rainbow" style="margin-right: 8px;" />
+        <span>Rainbow</span>
+      </label>
+    </div>
+  </div>
+</div>
+  </div>
+  
+  <label for="sheen" style="display: block; margin-top: 10px; font-weight: bold;">Sheen:</label>
+  <select id="sheen" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+    <option value="">Select...</option>
+    <option value="matte">Matte</option>
+    <option value="glossy">Glossy</option>
+    <option value="silk">Silk</option>
+    <option value="glitter">Glitter</option>
+    <option value="metallic">Metallic</option>
+    <option value="satin">Satin</option>
+  </select>
+  
+  <label for="glowInDark" style="display: block; margin-top: 10px; font-weight: bold;">Glow in the Dark:</label>
+  <div style="display: flex; justify-content: center; gap: 20px; margin-top: 5px;">
+    <label style="display: flex; align-items: center; cursor: pointer;">
+      <input type="radio" name="glowInDark" value="no" checked style="margin-right: 5px;" />
+      No
+    </label>
+    <label style="display: flex; align-items: center; cursor: pointer;">
+      <input type="radio" name="glowInDark" value="yes" style="margin-right: 5px;" />
+      Yes
+    </label>
+  </div>
+  
+  <label for="texture" style="display: block; margin-top: 10px; font-weight: bold;">Texture:</label>
+  <select id="texture" style="padding: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; width: 100%; box-sizing: border-box;">
+    <option value="">Select...</option>
+    <option value="smooth">Smooth</option>
+    <option value="textured">Textured</option>
+    <option value="wood-grain">Wood Grain</option>
+    <option value="marble">Marble</option>
+    <option value="carbon-fiber">Carbon Fiber</option>
+    <option value="fuzzy">Fuzzy</option>
+  </select>
+</div>
+
+  <!-- Spool Weight Section -->
+  <div style="background: #e8f4f8; padding: 15px; border-radius: 8px; margin: 15px 0;">
+    <h3 style="margin-top: 0; font-size: 1.1em;">Spool Weight Information</h3>
+    
+    <label for="emptySpoolSelect" style="display: block; margin-top: 10px; font-weight: bold;">Empty Spool:</label>
+    <select id="emptySpoolSelect" onchange="handleEmptySpoolSelection()"></select>
+
+    <input 
+      id="fullSpoolWeight" 
+      type="number" 
+      step="0.01" 
+      placeholder="Full spool weight (including empty spool) (g)" 
+      oninput="calculateFilamentAmount()"
+      style="margin-top: 10px;"
+    />
+
+    <div id="filamentAmountDisplay" style="margin-top: 10px; padding: 10px; background: white; border-radius: 6px; display: none;">
+      <strong>Calculated Filament Amount:</strong>
+      <div style="font-size: 1.3em; color: #007acc; font-weight: bold; margin-top: 5px;" id="filamentAmount">0g</div>
+    </div>
+  </div>
   
   <div class="button-container">
     <button onclick="saveSpool()">Save Spool</button>
-    <button type="button" id="manageEmptySpoolsBtn">Manage Empty Spools</button>
+    <button type="button" onclick="window.location.href='emptyspools.html'">Manage Empty Spools</button>
     <button onclick="showScreen('home')">⬅ Back</button>
   </div>
 </section>
@@ -95,33 +275,33 @@
 <section id="tracking" class="hidden">
   <h2>Print Job Tracking</h2>
 
-<!-- Start Print Form -->
-<section id="startPrintSection">
-  <h2>Start Print Job</h2>
-  <input id="jobName" placeholder="Enter print job name (optional)" />
-  <label for="selectSpools">Select Spools (multi-select):</label>
-  <select id="selectSpools" multiple size="5" style="width: 100%;"></select>
-  
-  <!-- NEW: Estimated weight fields will appear here per spool -->
-  <div id="estimatedWeightsContainer"></div>
-  
-  <div class="button-container">
-    <button onclick="startPrintJob()">Start Print</button>
-    <button onclick="showScreen('home')">⬅ Back</button>
-  </div>
-</section>
+  <!-- Start Print Form -->
+  <section id="startPrintSection">
+    <h2>Start Print Job</h2>
+    <input id="jobName" placeholder="Enter print job name (optional)" />
+    <label for="selectSpools">Select Spools (multi-select):</label>
+    <select id="selectSpools" multiple size="5" style="width: 100%;"></select>
+    
+    <!-- NEW: Estimated weight fields will appear here per spool -->
+    <div id="estimatedWeightsContainer"></div>
+    
+    <div class="button-container">
+      <button onclick="startPrintJob()">Start Print</button>
+      <button onclick="showScreen('home')">⬅ Back</button>
+    </div>
+  </section>
 
   <section id="endPrintSection" class="hidden">
-  <h3 id="activeJobName"></h3>
-  <div id="endWeightsContainer"></div>
-  
-  <div class="button-container">
-    <button onclick="endPrintJob()">✅ End Print (Success)</button>
-    <button onclick="failedPrintJob()" style="background: #ff6b6b;">❌ Failed Print</button>
-    <button onclick="cancelActiveJob()">Cancel Job</button>
-    <button onclick="showScreen('home')">⬅ Back</button>
-  </div>
-</section>
+    <h3 id="activeJobName"></h3>
+    <div id="endWeightsContainer"></div>
+    
+    <div class="button-container">
+      <button onclick="endPrintJob()">✅ End Print (Success)</button>
+      <button onclick="failedPrintJob()" style="background: #ff6b6b;">❌ Failed Print</button>
+      <button onclick="cancelActiveJob()">Cancel Job</button>
+      <button onclick="showScreen('home')">⬅ Back</button>
+    </div>
+  </section>
 </section>
 
 <!-- Analytics screen -->
@@ -131,19 +311,38 @@
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
 
-<!-- Settings Screen -->
-<section id="settings" class="hidden">
-  <h2>Settings</h2>
+<!-- Materials Management Screen -->
+<section id="materials" class="hidden">
+  <h2>Manage Material Types</h2>
   
-  <!-- Material Management -->
   <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
-    <h3>Manage Material Types</h3>
     <ul id="materialsList" style="list-style: none; padding: 0;"></ul>
     
     <div style="margin-top: 15px;">
       <input id="newMaterialInput" placeholder="Add new material type" style="width: 70%; display: inline-block;" />
       <button onclick="addNewMaterial()" style="width: 25%; display: inline-block; margin-left: 3%;">Add</button>
     </div>
+  </div>
+  
+  <button onclick="showScreen('home')">⬅ Back</button>
+</section>
+
+<!-- Settings Screen -->
+<section id="settings" class="hidden">
+  <h2>Settings</h2>
+  
+  <!-- Company Branding -->
+  <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
+    <h3>Company Branding</h3>
+    <label for="companyName" style="display: block; margin-top: 10px; font-weight: bold;">Your Company Name (Optional):</label>
+    <input 
+      id="companyName" 
+      type="text" 
+      placeholder="e.g., Acme 3D Printing Co." 
+      style="width: 100%; padding: 10px; margin-top: 5px; font-size: 1em;"
+    />
+    <small style="color: #666; display: block; margin-top: 5px;">This will appear below "Filament Foundry" in the header</small>
+    <button onclick="saveBranding()" style="margin-top: 10px;">Save Branding</button>
   </div>
   
   <button id="checkUpdatesBtn">Check for Updates</button>
@@ -155,6 +354,19 @@
   <a href="https://getdataforge.com" style="color: #a6d1ff; text-decoration: none;">getdataforge.com</a> | 
   <a href="mailto:DataForgeApps@gmail.com" style="color: #a6d1ff; text-decoration: none;">Contact</a>
 </footer>
+
+<!-- Empty Spool Modal -->
+<div id="emptySpoolModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Manage Empty Spools</h2>
+      <button class="modal-close" onclick="closeEmptySpoolModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="emptySpoolModalBody">
+      <!-- Content will be loaded here -->
+    </div>
+  </div>
+</div>
 
 <script src="home.js"></script>
 </body>

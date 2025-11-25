@@ -13,9 +13,9 @@ let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
   "Custom"
 ];
 
-let activePrintJob = null; // Will hold current job data
-let historyDisplayCount = 10; // how many entries to show
-let historyPage = 0; // current page (0 = newest 10)
+let activePrintJob = null;
+let historyDisplayCount = 10;
+let historyPage = 0;
 
 // ----- Screen Navigation -----
 function showScreen(id) {
@@ -35,7 +35,7 @@ function showScreen(id) {
       document.getElementById("startPrintSection").classList.add("hidden");
       document.getElementById("endPrintSection").classList.remove("hidden");
       document.getElementById("activeJobName").textContent = `Active Job: ${activePrintJob.jobName}`;
-      showEndPrintSection(); // Re-render the end section
+      showEndPrintSection();
     } else {
       document.getElementById("startPrintSection").classList.remove("hidden");
       document.getElementById("endPrintSection").classList.add("hidden");
@@ -47,9 +47,9 @@ function showScreen(id) {
     populateEmptySpoolDropdown();
   }
   if (id === "analytics") renderAnalytics();
-  if (id === "settings") {
-  renderMaterialsList(); // Render materials list when opening settings
-}
+  if (id === "materials") {
+    renderMaterialsList(); // Render materials list when opening materials screen
+  }
 }
 
 // ----- Material Management Functions -----
@@ -75,7 +75,6 @@ function renderMaterialsList() {
     
     li.appendChild(span);
     
-    // Don't allow deleting "Custom"
     if (material !== "Custom") {
       const deleteBtn = document.createElement("button");
       deleteBtn.textContent = "Delete";
@@ -96,6 +95,38 @@ function renderMaterialsList() {
   });
 }
 
+// ----- Branding Functions -----
+function saveBranding() {
+  const companyName = document.getElementById("companyName").value.trim();
+  localStorage.setItem("companyName", companyName);
+  
+  // Update the display immediately
+  loadBranding();
+  
+  alert("Branding saved!");
+}
+
+function loadBranding() {
+  const companyName = localStorage.getItem("companyName") || "";
+  const display = document.getElementById("companyNameDisplay");
+  const input = document.getElementById("companyName");
+  
+  // Update header display
+  if (display) {
+    if (companyName) {
+      display.textContent = companyName;
+      display.style.display = "block";
+    } else {
+      display.style.display = "none";
+    }
+  }
+  
+  // Update input field if on settings page
+  if (input) {
+    input.value = companyName;
+  }
+}
+
 function addNewMaterial() {
   const input = document.getElementById("newMaterialInput");
   const newMaterial = input.value.trim();
@@ -110,7 +141,6 @@ function addNewMaterial() {
     return;
   }
   
-  // Insert before "Custom"
   const customIndex = materialsList.indexOf("Custom");
   if (customIndex !== -1) {
     materialsList.splice(customIndex, 0, newMaterial);
@@ -127,7 +157,6 @@ function addNewMaterial() {
 function deleteMaterial(index) {
   const material = materialsList[index];
   
-  // Check if any spools use this material
   const spoolsUsingMaterial = spoolLibrary.filter(spool => spool.material === material);
   
   if (spoolsUsingMaterial.length > 0) {
@@ -174,11 +203,6 @@ function handleMaterialChange() {
 // ----- Data Storage for Empty Spools -----
 let emptySpoolsLibrary = JSON.parse(localStorage.getItem("emptySpools")) || [];
 
-// ----- Utils -----
-function saveEmptySpoolsLibrary() {
-  localStorage.setItem("emptySpools", JSON.stringify(emptySpoolsLibrary));
-}
-
 // ----- Populate dropdown -----
 function populateEmptySpoolDropdown() {
   const select = document.getElementById("emptySpoolSelect");
@@ -186,21 +210,18 @@ function populateEmptySpoolDropdown() {
   
   select.innerHTML = "";
 
-  // Default option
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
   noneOpt.textContent = "None";
   select.appendChild(noneOpt);
 
-  // Existing empty spools
   emptySpoolsLibrary.forEach((spool, idx) => {
     const opt = document.createElement("option");
-    opt.value = idx; // index reference
+    opt.value = idx;
     opt.textContent = `${spool.brand} – ${spool.package} (${spool.weight} g)`;
     select.appendChild(opt);
   });
 
-  // Other option
   const otherOpt = document.createElement("option");
   otherOpt.value = "other";
   otherOpt.textContent = "Other (Add new…)";
@@ -209,25 +230,62 @@ function populateEmptySpoolDropdown() {
   select.value = "";
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const checkUpdatesBtn = document.getElementById("checkUpdatesBtn");
-  if (checkUpdatesBtn) {
-    checkUpdatesBtn.addEventListener("click", () => {
-      if (!newWorker) {
-        alert("No update available at this time.");
-      } else {
-        showUpdatePrompt(() => {
-          newWorker.postMessage({ action: "skipWaiting" });
-        });
-      }
-    });
+// ----- Handle empty spool selection and calculate filament amount -----
+function handleEmptySpoolSelection() {
+  const select = document.getElementById("emptySpoolSelect");
+  
+  if (select.value === "other") {
+    openEmptySpoolModal(); // Open modal instead of new tab
+    select.value = "";
+    return;
   }
+  
+  calculateFilamentAmount();
+}
 
-  // Initialize by showing home screen and populating material dropdown
-  showScreen("home");
-  populateMaterialDropdown();
-  loadBranding(); // NEW LINE - Load branding when page loads
-});
+function calculateFilamentAmount() {
+  const emptySpoolSelect = document.getElementById("emptySpoolSelect");
+  const fullWeight = parseFloat(document.getElementById("fullSpoolWeight").value) || 0;
+  
+  let emptyWeight = 0;
+  
+  if (emptySpoolSelect.value !== "" && emptySpoolSelect.value !== "other") {
+    const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
+    const selectedSpool = emptySpools[emptySpoolSelect.value];
+    if (selectedSpool) {
+      emptyWeight = selectedSpool.weight;
+    }
+  }
+  
+  const filamentAmount = fullWeight - emptyWeight;
+  
+  const displayDiv = document.getElementById("filamentAmountDisplay");
+  const amountSpan = document.getElementById("filamentAmount");
+  
+  if (fullWeight > 0 && emptyWeight > 0 && filamentAmount > 0) {
+    displayDiv.style.display = "block";
+    amountSpan.textContent = `${filamentAmount.toFixed(2)}g (Full: ${fullWeight.toFixed(2)}g - Empty: ${emptyWeight.toFixed(2)}g)`;
+  } else {
+    displayDiv.style.display = "none";
+  }
+}
+
+
+
+// ----- Handle Color Type Change -----
+function handleColorTypeChange() {
+  const colorType = document.getElementById("colorType").value;
+  const solidFields = document.getElementById("solidColorFields");
+  const gradientFields = document.getElementById("gradientColorFields");
+  
+  if (colorType === "gradient") {
+    solidFields.classList.add("hidden");
+    gradientFields.classList.remove("hidden");
+  } else {
+    solidFields.classList.remove("hidden");
+    gradientFields.classList.add("hidden");
+  }
+}
 
 // ----- Save Spool -----
 function saveSpool() {
@@ -247,28 +305,94 @@ function saveSpool() {
     }
     material = customMaterial;
 
-    // Add new custom material if not already present
     if (!materialsList.includes(material)) {
-      materialsList.splice(materialsList.length - 1, 0, material); // before "Custom"
+      materialsList.splice(materialsList.length - 1, 0, material);
       localStorage.setItem("materialsList", JSON.stringify(materialsList));
     }
   }
 
   const lengthInput = document.getElementById("length").value;
-  const length = lengthInput ? parseFloat(lengthInput) : 0; // Length is now optional
-  const weight = parseFloat(document.getElementById("weight").value);
-
-  // Only require brand, color, material, and weight - length is optional
-  if (!brand || !color || !material || isNaN(weight)) {
-    alert("Please fill out Brand, Color, Material, and Weight fields.");
-    return;
-  }
+  const length = lengthInput ? parseFloat(lengthInput) : 0;
+  
+  const fullSpoolWeight = parseFloat(document.getElementById("fullSpoolWeight").value);
 
   // Get empty spool reference if selected
   const emptySpoolSelect = document.getElementById("emptySpoolSelect");
-  let emptySpoolId = emptySpoolSelect.value === "" ? null : Number(emptySpoolSelect.value);
+  let emptySpoolId = emptySpoolSelect.value === "" || emptySpoolSelect.value === "other" 
+    ? null 
+    : Number(emptySpoolSelect.value);
+  
+  let emptyWeight = 0;
+  if (emptySpoolId !== null) {
+    const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
+    const selectedSpool = emptySpools[emptySpoolId];
+    if (selectedSpool) {
+      emptyWeight = selectedSpool.weight;
+    }
+  }
+  
+  const weight = fullSpoolWeight - emptyWeight;
 
-  spoolLibrary.push({ brand, color, material, length, weight, emptySpoolId });
+// Get color details
+  const colorType = document.getElementById("colorType").value;
+  let baseColor = "";
+  let gradientBaseColors = [];
+  
+  if (colorType === "solid") {
+    baseColor = document.getElementById("baseColorSolid").value;
+  } else {
+    // Get checked gradient colors
+    const checkedBoxes = document.querySelectorAll('input[name="gradientColors"]:checked');
+    gradientBaseColors = Array.from(checkedBoxes).map(cb => cb.value);
+  }
+  
+  const sheen = document.getElementById("sheen").value;
+  const glowInDark = document.querySelector('input[name="glowInDark"]:checked').value;
+  const texture = document.getElementById("texture").value;
+
+  // Validation
+  if (!brand || !color || !material || isNaN(fullSpoolWeight)) {
+    alert("Please fill out Brand, Color, Material, and Full Spool Weight fields.");
+    return;
+  }
+  
+  if (emptySpoolId !== null && weight <= 0) {
+    alert("Full spool weight must be greater than empty spool weight.");
+    return;
+  }
+
+if (colorType === "solid" && !baseColor) {
+    alert("Please select a base color.");
+    return;
+  }
+  
+  if (colorType === "gradient" && gradientBaseColors.length === 0) {
+    alert("Please select at least one base color for the gradient.");
+    return;
+  }
+  
+  if (colorType === "gradient" && gradientBaseColors.length > 3) {
+    alert("Please select up to 3 base colors for the gradient.");
+    return;
+  }
+
+spoolLibrary.push({ 
+    brand, 
+    color, 
+    material, 
+    length, 
+    weight: emptySpoolId !== null ? weight : fullSpoolWeight,
+    emptyWeight: emptySpoolId !== null ? emptyWeight : 0,
+    fullSpoolWeight,
+    emptySpoolId,
+    // Color details
+    colorType,
+    baseColor: colorType === "solid" ? baseColor : "",
+    gradientBaseColors: colorType === "gradient" ? gradientBaseColors : [],
+    sheen,
+    glowInDark,
+    texture
+  });
   localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
 
   // Reset form
@@ -276,65 +400,21 @@ function saveSpool() {
   document.getElementById("color").value = "";
   populateMaterialDropdown();
   document.getElementById("length").value = "";
-  document.getElementById("weight").value = "";
+  document.getElementById("fullSpoolWeight").value = "";
+  document.getElementById("filamentAmountDisplay").style.display = "none";
   populateEmptySpoolDropdown();
+  // Reset color details
+  document.getElementById("colorType").value = "solid";
+  document.getElementById("baseColorSolid").value = "";
+  document.querySelectorAll('input[name="gradientColors"]').forEach(cb => cb.checked = false);
+  handleColorTypeChange(); // Reset visibility
+  document.getElementById("sheen").value = "";
+  document.querySelector('input[name="glowInDark"][value="no"]').checked = true;
+  document.getElementById("texture").value = "";
 
-  alert("Spool saved!");
+  const savedWeight = emptySpoolId !== null ? weight.toFixed(2) : fullSpoolWeight.toFixed(2);
+  alert(`Spool saved! ${emptySpoolId !== null ? 'Filament amount: ' : 'Weight: '}${savedWeight}g`);
   showScreen("library");
-}
-
-// ----- Populate Spool Select in Tracking -----
-function populateSpoolSelect() {
-  const select = document.getElementById("selectSpools");
-  select.innerHTML = ""; // Clear existing options
-
-  // Add the default placeholder option
-  const defaultOption = document.createElement("option");
-  defaultOption.value = "";           // empty value means no spool selected
-  defaultOption.textContent = "~select a spool~";
-  defaultOption.disabled = true;      // user cannot select it once another option is chosen
-  defaultOption.selected = true;      // this option is selected by default
-  select.appendChild(defaultOption);
-
-  // Add the spools from the library
-  spoolLibrary.forEach((spool, index) => {
-    const option = document.createElement("option");
-    option.value = index;              // use index as value
-    option.textContent = `${spool.brand} - ${spool.color} - ${spool.material}`;
-    select.appendChild(option);
-  });
-}
-
-// ----- Save Usage -----
-function saveUsage() {
-  const select = document.getElementById("selectSpools");
-  const selectedIndex = select.value;
-
-  if (selectedIndex === "") {
-    alert("Please select a spool.");
-    return;
-  }
-
-  const spool = spoolLibrary[selectedIndex];
-  const lengthUsed = parseFloat(document.getElementById("inputLengthUsed").value);
-
-  if (isNaN(lengthUsed) || lengthUsed <= 0) {
-    alert("Please enter a valid length used.");
-    return;
-  }
-
-  usageHistory.push({
-    spoolIndex: selectedIndex,
-    spoolBrand: spool.brand,
-    spoolMaterial: spool.material,
-    spoolColor: spool.color,
-    lengthUsed: lengthUsed,
-    date: new Date().toISOString(),
-  });
-  localStorage.setItem("usageHistory", JSON.stringify(usageHistory));
-
-  alert("Usage saved!");
-  showScreen("home");
 }
 
 // ----- Render Library -----
@@ -347,9 +427,23 @@ function renderLibrary() {
   }
   spoolLibrary.forEach((spool, index) => {
     const li = document.createElement("li");
-    li.setAttribute('data-spool-id', index.toString());  // Set data attribute for id
+    li.setAttribute('data-spool-id', index.toString());
     const lengthDisplay = spool.length > 0 ? `${spool.length}m, ` : '';
-    li.textContent = `${spool.brand} - ${spool.color} - ${spool.material} (${lengthDisplay}${spool.weight}g)`;
+    
+    let weightDisplay = `${spool.weight.toFixed(2)}g filament`;
+    if (spool.fullSpoolWeight && spool.emptyWeight) {
+      weightDisplay = `${spool.weight.toFixed(2)}g filament (Full: ${spool.fullSpoolWeight.toFixed(2)}g - Empty: ${spool.emptyWeight.toFixed(2)}g)`;
+    }
+    
+    // Build color display
+    let colorDisplay = spool.color;
+    if (spool.colorType === "solid" && spool.baseColor) {
+      colorDisplay += ` - [${spool.baseColor}]`;
+    } else if (spool.colorType === "gradient" && spool.gradientBaseColors && spool.gradientBaseColors.length > 0) {
+      colorDisplay += ` - [${spool.gradientBaseColors.join(", ")}]`;
+    }
+    
+    li.textContent = `${spool.brand} - ${colorDisplay} - ${spool.material} (${lengthDisplay}${weightDisplay})`;
     list.appendChild(li);
   });
 }
@@ -357,7 +451,7 @@ function renderLibrary() {
 // ----- Render History with Filtering -----
 function renderHistory() {
   populateHistorySpoolDropdown();
-  renderHistoryFiltered(true); // show last 10 by default
+  renderHistoryFiltered(true);
   setupLiveFilters();
 }
 
@@ -370,9 +464,8 @@ function renderHistoryFiltered(defaultLastTen = false) {
 
   const startDate = startDateVal ? new Date(startDateVal) : null;
   const endDate = endDateVal ? new Date(endDateVal) : null;
-  if (endDate) endDate.setHours(23, 59, 59, 999); // include entire day
+  if (endDate) endDate.setHours(23, 59, 59, 999);
 
-  // Filter first
   let filtered = usageHistory.filter(job => {
     const jobDate = new Date(job.startTime);
     if (startDate && jobDate < startDate) return false;
@@ -381,10 +474,8 @@ function renderHistoryFiltered(defaultLastTen = false) {
     return job.spools.some(s => (s.spoolLabel || "").toLowerCase().includes(spoolLabel.toLowerCase()));
   });
 
-  // Sort newest first
   filtered.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
 
-  // If no filters and defaultLastTen requested, slice to last 10
   const noFiltersApplied = !startDateVal && !endDateVal && !spoolLabel;
   if (defaultLastTen && noFiltersApplied) {
     filtered = filtered.slice(0, 10);
@@ -408,7 +499,6 @@ function renderHistoryFiltered(defaultLastTen = false) {
     list.appendChild(li);
   });
 
-  // Add click handlers to spool links
   document.querySelectorAll('.spool-link').forEach(link => {
     link.addEventListener('click', e => {
       e.preventDefault();
@@ -422,32 +512,26 @@ function renderHistoryFiltered(defaultLastTen = false) {
 // ----- Render Analytics -----
 function renderAnalytics() {
   const canvas = document.getElementById('usageChart');
-  if (!canvas) return; // Canvas might not exist if section hidden
+  if (!canvas) return;
 
   const ctx = canvas.getContext('2d');
 
-  // Destroy existing chart instance if exists to prevent overlap
   if (window.usageChartInstance) {
     window.usageChartInstance.destroy();
   }
 
-  // Aggregate usage by material from new data structure
   const usageByMaterial = {};
   
   usageHistory.forEach(job => {
-    // Handle new format (print jobs with spools array)
     if (job.spools && Array.isArray(job.spools)) {
       job.spools.forEach(spool => {
-        // Extract material from spoolLabel: "Brand - Color (Material) (Weight)"
         const materialMatch = spool.spoolLabel.match(/\(([^)]+)\)/);
         const material = materialMatch ? materialMatch[1] : "Unknown";
         const used = spool.used || spool.gramsUsed || 0;
         
         usageByMaterial[material] = (usageByMaterial[material] || 0) + used;
       });
-    }
-    // Handle legacy format (if any old data exists)
-    else if (job.spoolMaterial && job.lengthUsed) {
+    } else if (job.spoolMaterial && job.lengthUsed) {
       const material = job.spoolMaterial;
       const used = job.lengthUsed || 0;
       usageByMaterial[material] = (usageByMaterial[material] || 0) + used;
@@ -457,7 +541,6 @@ function renderAnalytics() {
   const labels = Object.keys(usageByMaterial);
   const data = Object.values(usageByMaterial);
 
-  // If no data, show message
   if (labels.length === 0) {
     ctx.font = "16px Arial";
     ctx.fillStyle = "#666";
@@ -569,9 +652,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Initialize by showing home screen and populating material dropdown
   showScreen("home");
   populateMaterialDropdown();
+  loadBranding(); // NEW LINE - Load branding when page loads
 });
 
 function populateSpoolMultiSelect() {
@@ -579,8 +662,8 @@ function populateSpoolMultiSelect() {
   select.innerHTML = "";
   spoolLibrary.forEach((spool, index) => {
     const option = document.createElement("option");
-    option.value = index;  // keep index as value
-    option.textContent = `${spool.brand} - ${spool.color} (${spool.material}) (${spool.weight}g)`;  // added weight here
+    option.value = index;
+    option.textContent = `${spool.brand} - ${spool.color} (${spool.material}) (${spool.weight}g)`;
     select.appendChild(option);
   });
 }
@@ -603,7 +686,6 @@ function startPrintJob() {
       throw new Error("Invalid start weight");
     }
 
-    // Get estimated weight (optional)
     const estimatedInput = document.getElementById(`estimatedWeight_${opt.value}`);
     const estimatedWeight = estimatedInput ? parseFloat(estimatedInput.value) || null : null;
 
@@ -613,7 +695,7 @@ function startPrintJob() {
       spoolId: opt.value,
       spoolLabel: label,
       startWeight,
-      estimatedWeight // Store for reference
+      estimatedWeight
     };
   });
 
@@ -641,7 +723,6 @@ function showEndPrintSection() {
     const div = document.createElement("div");
     div.style.marginBottom = "15px";
     
-    // Calculate expected final weight if estimated was provided
     let calculatedFinalWeight = "";
     let estimatedText = "";
     if (spool.estimatedWeight) {
@@ -673,30 +754,24 @@ function endPrintJob() {
     const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
     let endWeight;
     
-    // If user provided a weight, use it
     if (endWeightInput && endWeightInput.trim() !== "") {
       endWeight = parseFloat(endWeightInput);
       if (isNaN(endWeight)) {
         alert("Invalid weight entered. Please check your inputs.");
         throw new Error("Invalid end weight");
       }
-    } 
-    // If estimated weight was provided, calculate final weight
-    else if (spoolData.estimatedWeight) {
+    } else if (spoolData.estimatedWeight) {
       endWeight = spoolData.startWeight - spoolData.estimatedWeight;
-    } 
-    // No estimate and no input - error
-    else {
+    } else {
       alert("Please enter final weight for all spools (or provide estimated usage when starting print).");
       throw new Error("Missing end weights");
     }
     
     const gramsUsed = spoolData.startWeight - endWeight;
 
-    // Find the correct spool index in the current spools array
     const spoolIndex = parseInt(spoolData.spoolId, 10);
     if (spoolIndex !== -1) {
-      spools[spoolIndex].weight = endWeight;  // update weight
+      spools[spoolIndex].weight = endWeight;
     }
 
     return {
@@ -707,7 +782,6 @@ function endPrintJob() {
     };
   });
 
-  // Save updated spools and history
   localStorage.setItem("spoolLibrary", JSON.stringify(spools));
 
   history.push({
@@ -716,7 +790,7 @@ function endPrintJob() {
     spools: updatedSpools,
     startTime: activePrintJob.startTime,
     endTime: new Date().toISOString(),
-    status: "success" // Mark as successful
+    status: "success"
   });
 
   localStorage.setItem("usageHistory", JSON.stringify(history));
@@ -751,7 +825,6 @@ function failedPrintJob() {
     
     const gramsUsed = spoolData.startWeight - endWeight;
 
-    // Update spool weight in library
     const spoolIndex = parseInt(spoolData.spoolId, 10);
     if (spoolIndex !== -1) {
       spools[spoolIndex].weight = endWeight;
@@ -765,10 +838,8 @@ function failedPrintJob() {
     };
   });
 
-  // Save updated spools
   localStorage.setItem("spoolLibrary", JSON.stringify(spools));
 
-  // Record in history with "FAILED" status
   history.push({
     jobId: activePrintJob.jobId,
     jobName: `FAILED: ${activePrintJob.jobName}`,
@@ -794,7 +865,6 @@ function cancelActiveJob() {
   }
 }
 
-// UI helper to show estimated weights when spools selected
 document.getElementById("selectSpools")?.addEventListener("change", () => {
   const container = document.getElementById("estimatedWeightsContainer");
   if (!container) return;
@@ -817,7 +887,6 @@ document.getElementById("selectSpools")?.addEventListener("change", () => {
   });
 });
 
-// Restore job if page reloads
 window.addEventListener("load", () => {
   const savedJob = JSON.parse(localStorage.getItem("activePrintJob"));
   if (savedJob) {
@@ -830,10 +899,8 @@ function highlightSpool(spoolId) {
   const spoolList = document.getElementById('spoolList');
   const items = spoolList.querySelectorAll('li');
 
-  // Clear previous highlights
   items.forEach(item => item.style.backgroundColor = '');
 
-  // spoolId might be string or number — compare as string for safety
   const targetItem = [...items].find(li => li.getAttribute('data-spool-id') === spoolId.toString());
 
   if (targetItem) {
@@ -846,7 +913,6 @@ function highlightSpool(spoolId) {
   }
 }
 
-// ----- Filter Helper Functions -----
 function populateHistorySpoolDropdown() {
   const spoolSelect = document.getElementById("filterSpool");
   if (!spoolSelect) return;
@@ -870,10 +936,6 @@ function populateHistorySpoolDropdown() {
   });
 }
 
-function applyHistoryFilters() {
-  renderHistoryFiltered(false);
-}
-
 function clearHistoryFilters() {
   const s = document.getElementById("filterStartDate");
   const e = document.getElementById("filterEndDate");
@@ -881,7 +943,7 @@ function clearHistoryFilters() {
   if (s) s.value = "";
   if (e) e.value = "";
   if (f) f.value = "";
-  renderHistoryFiltered(true); // back to last 10
+  renderHistoryFiltered(true);
 }
 
 function setupLiveFilters() {
@@ -904,5 +966,121 @@ function setupLiveFilters() {
 function resetHistoryPagination() {
   historyPage = 0;
 }
+
+// ----- Empty Spool Modal Functions -----
+function openEmptySpoolModal() {
+  const modal = document.getElementById("emptySpoolModal");
+  const modalBody = document.getElementById("emptySpoolModalBody");
+  
+  // Load the empty spool interface
+  modalBody.innerHTML = `
+    <div style="margin-bottom: 20px;">
+      <input id="modalEmptyBrand" placeholder="Brand" style="width: 100%; padding: 10px; margin-bottom: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+      <input id="modalEmptyPackage" placeholder="Package Type (e.g., 1kg, 500g)" style="width: 100%; padding: 10px; margin-bottom: 10px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+      <input id="modalEmptyWeight" type="number" step="0.01" placeholder="Empty Spool Weight (g)" style="width: 100%; padding: 10px; margin-bottom: 15px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+      <button onclick="saveEmptySpoolFromModal()" style="width: 100%; padding: 12px; background: #007acc; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">Save Empty Spool</button>
+    </div>
+    
+    <h3 style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">Existing Empty Spools</h3>
+    <ul id="modalEmptySpoolList" style="list-style: none; padding: 0;"></ul>
+  `;
+  
+  // Render existing empty spools
+  renderModalEmptySpoolList();
+  
+  modal.style.display = "block";
+}
+
+function closeEmptySpoolModal() {
+  const modal = document.getElementById("emptySpoolModal");
+  modal.style.display = "none";
+  
+  // Refresh the dropdown in Add Spool form
+  populateEmptySpoolDropdown();
+}
+
+function saveEmptySpoolFromModal() {
+  const brand = document.getElementById("modalEmptyBrand").value.trim();
+  const packageType = document.getElementById("modalEmptyPackage").value.trim();
+  const weight = parseFloat(document.getElementById("modalEmptyWeight").value);
+  
+  if (!brand || !packageType || isNaN(weight)) {
+    alert("Please fill out all fields.");
+    return;
+  }
+  
+  emptySpoolsLibrary.push({ brand: brand, package: packageType, weight: weight });
+  saveEmptySpoolsLibrary();
+  
+  // Clear inputs
+  document.getElementById("modalEmptyBrand").value = "";
+  document.getElementById("modalEmptyPackage").value = "";
+  document.getElementById("modalEmptyWeight").value = "";
+  
+  // Re-render list
+  renderModalEmptySpoolList();
+  
+  alert("Empty spool saved!");
+}
+
+function renderModalEmptySpoolList() {
+  const list = document.getElementById("modalEmptySpoolList");
+  if (!list) return;
+  
+  list.innerHTML = "";
+  
+  if (emptySpoolsLibrary.length === 0) {
+    list.innerHTML = "<li style='padding: 10px; color: #666;'>No empty spools saved yet.</li>";
+    return;
+  }
+  
+  emptySpoolsLibrary.forEach((spool, index) => {
+    const li = document.createElement("li");
+    li.style.padding = "10px";
+    li.style.marginBottom = "8px";
+    li.style.background = "#f0f4f8";
+    li.style.borderRadius = "6px";
+    li.style.display = "flex";
+    li.style.justifyContent = "space-between";
+    li.style.alignItems = "center";
+    
+    const span = document.createElement("span");
+    span.textContent = `${spool.brand} – ${spool.package} (${spool.weight}g)`;
+    
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "Delete";
+    deleteBtn.style.padding = "6px 12px";
+    deleteBtn.style.background = "#ff6b6b";
+    deleteBtn.style.color = "white";
+    deleteBtn.style.border = "none";
+    deleteBtn.style.borderRadius = "4px";
+    deleteBtn.style.cursor = "pointer";
+    deleteBtn.onclick = () => deleteEmptySpoolFromModal(index);
+    
+    li.appendChild(span);
+    li.appendChild(deleteBtn);
+    list.appendChild(li);
+  });
+}
+
+function deleteEmptySpoolFromModal(index) {
+  if (confirm("Delete this empty spool?")) {
+    emptySpoolsLibrary.splice(index, 1);
+    saveEmptySpoolsLibrary();
+    renderModalEmptySpoolList();
+  }
+}
+
+function saveEmptySpoolsLibrary() {
+  localStorage.setItem("emptySpools", JSON.stringify(emptySpoolsLibrary));
+}
+
+// Close modal when clicking outside of it
+window.addEventListener("click", (e) => {
+  const modal = document.getElementById("emptySpoolModal");
+  if (e.target === modal) {
+    closeEmptySpoolModal();
+  }
+});
 
 window.showScreen = showScreen;
