@@ -1084,3 +1084,14 @@ window.addEventListener("click", (e) => {
 });
 
 window.showScreen = showScreen;
+
+// iOS keyboard scroll fix
+if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+  document.querySelectorAll('input, select, textarea').forEach(element => {
+    element.addEventListener('focus', function() {
+      setTimeout(() => {
+        this.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    });
+  });
+}
