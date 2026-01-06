@@ -27,7 +27,11 @@ auth.onAuthStateChanged(async (user) => {
       console.error('Error loading subscription:', error);
     }
     
-    checkAndMigrate();
+    // Check for migration first
+    await checkAndMigrate();
+    
+    // Then load all data from Firebase
+    await loadUserData();
   }
 });
 
