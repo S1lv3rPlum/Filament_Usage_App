@@ -3,7 +3,7 @@ body {
   margin: 0;
   padding: 0;
   background: #f0f4f8;
-  padding-bottom: 60px; /* Space for fixed footer */
+  padding-bottom: 80px; /* Increased space for fixed footer */
 }
 
 header {
@@ -71,7 +71,7 @@ input:not([type="checkbox"]):not([type="radio"]), select {
 
 main, section {
   padding: 15px;
-  padding-bottom: 80px; /* Extra space above footer for buttons */
+  padding-bottom: 120px; /* Extra space above footer for buttons */
 }
 
 .hidden {
@@ -189,11 +189,11 @@ table button {
 /* Responsive adjustments */
 @media (max-width: 600px) {
   body {
-    padding-bottom: 70px;
+    padding-bottom: 100px;
   }
   
   main, section {
-    padding-bottom: 90px;
+    padding-bottom: 140px;
   }
   
   button {
@@ -295,4 +295,7 @@ table button {
   display: flex;
   align-items: center;
   cursor: pointer;
+}
+html {
+  scroll-padding-top: 100px; /* Offset for header when scrolling to inputs */
 }

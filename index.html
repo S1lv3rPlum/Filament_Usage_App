@@ -66,20 +66,27 @@
   <p class="subtle">Contact: <a href="mailto:DataForgeApps@gmail.com">DataForgeApps@gmail.com</a></p>
   <p class="subtle"><a href="https://getdataforge.com">getdataforge.com</a></p>
   
-  <script>
-    // Delayed redirect with error fallback
-    setTimeout(() => {
-      fetch('home.html')
-        .then(response => {
-          if (response.ok) {
-            window.location.href = 'home.html';
-          } else {
-            alert("home.html not found.");
-          }
-        })
-        .catch(() => alert("Network error. Couldn't load home.html."));
-    }, 3000);
-  </script>
+ <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<script src="firebase-config.js"></script>
+
+<script>
+  // Check authentication status and redirect accordingly
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      // User is logged in, go to home
+      console.log('User authenticated, redirecting to home...');
+      window.location.href = 'home.html';
+    } else {
+      // User is not logged in, go to auth
+      console.log('User not authenticated, redirecting to login...');
+      window.location.href = 'auth.html';
+    }
+  });
+</script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

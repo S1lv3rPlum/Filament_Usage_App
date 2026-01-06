@@ -13,7 +13,7 @@
   <header>
   <h1>Filament Foundry</h1>
   <p id="companyNameDisplay" style="font-size: 1em; margin-top: 5px; opacity: 0.95; font-weight: 600;"></p>
-  <p style="font-size: 0.85em; margin-top: 5px; opacity: 0.9;">by DataForge</p>
+  
 </header>
 
 <main id="home">
@@ -331,6 +331,21 @@
 <section id="settings" class="hidden">
   <h2>Settings</h2>
   
+  <!-- Upgrade Banner -->
+  <div style="margin: 20px 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white; text-align: center;">
+    <h3 style="margin: 0 0 10px 0; font-size: 1.4em;">🚀 Upgrade to Pro</h3>
+    <p style="margin: 0 0 15px 0; opacity: 0.95;">Unlimited spools, advanced analytics, team collaboration & more!</p>
+    <button onclick="alert('Subscription options coming soon! 🎉')" style="background: white; color: #667eea; font-weight: bold;">Coming Soon!</button>
+  </div>
+
+  <!-- Usage Stats -->
+  <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
+    <h3>Account Usage</h3>
+    <p><strong>Account Type:</strong> Free Tier</p>
+    <p id="spoolCount"><strong>Spools:</strong> 0 / 25</p>
+    <p><strong>Print History:</strong> Last 50 jobs saved</p>
+  </div>
+
   <!-- Company Branding -->
   <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
     <h3>Company Branding</h3>
@@ -344,8 +359,51 @@
     <small style="color: #666; display: block; margin-top: 5px;">This will appear below "Filament Foundry" in the header</small>
     <button onclick="saveBranding()" style="margin-top: 10px;">Save Branding</button>
   </div>
+
+  <!-- Data Management -->
+<div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
+  <h3>Data Management</h3>
+  
+  <p style="margin: 10px 0; color: #666;">Backup your data or restore from a previous backup.</p>
+  
+  <button onclick="exportUserData()" style="background: #28a745; margin: 5px 0;">
+    📥 Export Data (Backup)
+  </button>
+  
+  <button onclick="document.getElementById('importFileInput').click()" style="background: #17a2b8; margin: 5px 0;">
+    📤 Import Data (Restore)
+  </button>
+  
+  <input 
+    type="file" 
+    id="importFileInput" 
+    accept=".json" 
+    style="display: none;" 
+    onchange="importUserData(event)"
+  />
+  
+  <p style="margin-top: 10px; font-size: 0.9em; color: #999;">
+    Export creates a backup file. Import restores data from a backup file.
+  </p>
+</div>
+
+<!-- Contact Developer -->
+<div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
+  <h3>Support & Privacy</h3>
+  
+  <p style="margin: 10px 0; color: #666;">Need help or want to delete your data?</p>
+  
+  <button onclick="contactDeveloper()" style="background: #6c757d; margin: 5px 0;">
+    📧 Contact Developer
+  </button>
+  
+  <button onclick="requestDataDeletion()" style="background: #dc3545; margin: 5px 0;">
+    🗑️ Request Data Deletion
+  </button>
+</div>
   
   <button id="checkUpdatesBtn">Check for Updates</button>
+  <button onclick="handleLogout()" style="background: #ff6b6b;">🚪 Logout</button>
   <button onclick="showScreen('home')">⬅ Back</button>
 </section>
 
@@ -368,6 +426,12 @@
   </div>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<script src="firebase-config.js"></script>
 <script src="home.js"></script>
 </body>
 </html>
