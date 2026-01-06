@@ -144,10 +144,10 @@ async function handleGoogleSignIn() {
     const result = await auth.signInWithPopup(provider);
     const user = result.user;
     
-    // Check if user document exists, create if not
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    
-    if (!userDoc.exists) {
+   // Check if user document exists, create if not
+const userDoc = await db.collection('users').doc(user.uid).get();
+
+if (!userDoc.exists) {
   await db.collection('users').doc(user.uid).set({
     email: user.email,
     displayName: user.displayName,
@@ -163,7 +163,6 @@ async function handleGoogleSignIn() {
     },
     organizations: []
   });
-}
     
     // User will be redirected by onAuthStateChanged listener
   } catch (error) {
