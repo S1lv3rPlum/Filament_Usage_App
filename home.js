@@ -1,5 +1,337 @@
+// ===== AUTH CHECK - MUST BE AT TOP =====
+let currentUser = null;
+
+console.log('Setting up auth listener...');
+console.log('auth object:', auth);
+
+let userSubscription = null;
+
+auth.onAuthStateChanged(async (user) => {
+  console.log('Auth state changed! User:', user);
+  
+  if (!user) {
+    console.log('No user logged in, redirecting to auth...');
+    window.location.href = 'auth.html';
+  } else {
+    currentUser = user;
+    console.log('User logged in:', user.email);
+    
+    // Load user's subscription status
+    try {
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        userSubscription = userDoc.data().subscription || { status: 'free', plan: 'free' };
+        console.log('Subscription status:', userSubscription.status);
+      }
+    } catch (error) {
+      console.error('Error loading subscription:', error);
+    }
+    
+    checkAndMigrate();
+  }
+});
+
+// ===== END AUTH CHECK =====
+
+// Check if user has Pro subscription
+function isProUser() {
+  if (!userSubscription) return false;
+  
+  // Check if subscription is active
+  if (userSubscription.status === 'active' || userSubscription.status === 'trial') {
+    // If there's an end date, check it hasn't expired
+    if (userSubscription.endDate) {
+      const endDate = userSubscription.endDate.toDate();
+      if (endDate < new Date()) {
+        console.log('Subscription expired');
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  return false;
+}
+
+// Logout function
+async function handleLogout() {
+  if (confirm('Are you sure you want to logout?')) {
+    try {
+      await auth.signOut();
+      console.log('User logged out');
+      window.location.href = 'auth.html';
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Logout failed. Please try again.');
+    }
+  }
+}
+
+// ===== DATA EXPORT/IMPORT FUNCTIONS =====
+
+// Export user data as JSON file
+async function exportUserData() {
+  if (!currentUser) {
+    alert('You must be logged in to export data.');
+    return;
+  }
+  
+  try {
+    const userId = currentUser.uid;
+    
+    // Gather all user data from Firebase
+    const userData = {
+      exportDate: new Date().toISOString(),
+      userEmail: currentUser.email,
+      version: "1.0",
+      data: {}
+    };
+    
+    // Get spools
+    const spoolsSnapshot = await db.collection('users').doc(userId).collection('spools').get();
+    userData.data.spools = spoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Get history
+    const historySnapshot = await db.collection('users').doc(userId).collection('history').get();
+    userData.data.history = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Get empty spools
+    const emptySpoolsSnapshot = await db.collection('users').doc(userId).collection('emptySpools').get();
+    userData.data.emptySpools = emptySpoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Get user document (includes materials list)
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      userData.data.userSettings = userDoc.data();
+    }
+    
+    // Create download
+    const dataStr = JSON.stringify(userData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `filament-foundry-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    alert('✅ Data exported successfully!\n\nSave this file in a safe place. You can use it to restore your data if needed.');
+    
+  } catch (error) {
+    console.error('Export error:', error);
+    alert('❌ Export failed. Please try again or contact support.');
+  }
+}
+
+// Import user data from JSON file
+async function importUserData(event) {
+  if (!currentUser) {
+    alert('You must be logged in to import data.');
+    return;
+  }
+  
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Confirm before importing
+  if (!confirm('⚠️ WARNING: Importing will ADD to your existing data.\n\nIf you want to REPLACE your data, please export a backup first, then delete your current data, then import.\n\nContinue with import?')) {
+    event.target.value = ''; // Reset file input
+    return;
+  }
+  
+  try {
+    const fileContent = await file.text();
+    const importData = JSON.parse(fileContent);
+    
+    // Validate file structure
+    if (!importData.data || !importData.version) {
+      throw new Error('Invalid backup file format');
+    }
+    
+    const userId = currentUser.uid;
+    const batch = db.batch();
+    
+    // Import spools
+    if (importData.data.spools && Array.isArray(importData.data.spools)) {
+      importData.data.spools.forEach((spool, index) => {
+        const spoolRef = db.collection('users').doc(userId).collection('spools').doc();
+        const { id, ...spoolData } = spool; // Remove old ID
+        batch.set(spoolRef, {
+          ...spoolData,
+          importedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+    }
+    
+    // Import history
+    if (importData.data.history && Array.isArray(importData.data.history)) {
+      importData.data.history.forEach((job, index) => {
+        const historyRef = db.collection('users').doc(userId).collection('history').doc();
+        const { id, ...jobData } = job; // Remove old ID
+        batch.set(historyRef, jobData);
+      });
+    }
+    
+    // Import empty spools
+    if (importData.data.emptySpools && Array.isArray(importData.data.emptySpools)) {
+      importData.data.emptySpools.forEach((spool, index) => {
+        const emptySpoolRef = db.collection('users').doc(userId).collection('emptySpools').doc();
+        const { id, ...spoolData } = spool; // Remove old ID
+        batch.set(emptySpoolRef, spoolData);
+      });
+    }
+    
+    // Import materials list if present
+    if (importData.data.userSettings && importData.data.userSettings.materialsList) {
+      const userRef = db.collection('users').doc(userId);
+      batch.update(userRef, {
+        materialsList: importData.data.userSettings.materialsList
+      });
+    }
+    
+    // Commit all changes
+    await batch.commit();
+    
+    alert('✅ Data imported successfully!\n\nYour data has been restored. The page will now refresh.');
+    window.location.reload();
+    
+  } catch (error) {
+    console.error('Import error:', error);
+    alert('❌ Import failed. Please check that you selected a valid backup file.\n\nError: ' + error.message);
+  } finally {
+    event.target.value = ''; // Reset file input
+  }
+}
+
+// Contact developer
+function contactDeveloper() {
+  const subject = encodeURIComponent('Filament Foundry Support Request');
+  const body = encodeURIComponent(`Hi DataForge Team,
+
+I need help with Filament Foundry.
+
+User Email: ${currentUser?.email || 'Not logged in'}
+Issue/Question:
+
+[Please describe your issue or question here]
+
+Thank you!`);
+  
+  window.location.href = `mailto:DataForgeApps@gmail.com?subject=${subject}&body=${body}`;
+}
+
+// Request data deletion
+function requestDataDeletion() {
+  if (!confirm('⚠️ This will send an email to request deletion of your account and all associated data.\n\nYou should export your data first if you want a backup.\n\nContinue?')) {
+    return;
+  }
+  
+  const subject = encodeURIComponent('Data Deletion Request - Filament Foundry');
+  const body = encodeURIComponent(`Hi DataForge Team,
+
+I would like to request deletion of my account and all associated data from Filament Foundry.
+
+User Email: ${currentUser?.email || 'Not logged in'}
+User ID: ${currentUser?.uid || 'Unknown'}
+
+Please confirm when this has been completed.
+
+Thank you!`);
+  
+  window.location.href = `mailto:DataForgeApps@gmail.com?subject=${subject}&body=${body}`;
+  
+  alert('✅ Email draft created!\n\nPlease send the email to complete your deletion request. We will respond within 48 hours.');
+}
+
+// ===== END DATA MANAGEMENT =====
+
+console.log("JS Loaded, showScreen is:", typeof showScreen);
 console.log("JS Loaded, showScreen is:", typeof showScreen);
 window.showScreen = showScreen;
+
+// ===== DATA MIGRATION FUNCTION =====
+async function checkAndMigrate() {
+  console.log('Checking for data migration...');
+  
+  // Check if there's localStorage data to migrate
+  const hasLocalSpools = localStorage.getItem('spoolLibrary');
+  const hasLocalHistory = localStorage.getItem('usageHistory');
+  const hasLocalEmptySpools = localStorage.getItem('emptySpools');
+  const hasLocalMaterials = localStorage.getItem('materialsList');
+  
+  if (!hasLocalSpools && !hasLocalHistory && !hasLocalEmptySpools && !hasLocalMaterials) {
+    console.log('No local data to migrate');
+    return;
+  }
+  
+  console.log('Local data found, migrating to Firebase...');
+  
+  try {
+    const batch = db.batch();
+    const userId = currentUser.uid;
+    
+    // Migrate spool library
+    if (hasLocalSpools) {
+      const spools = JSON.parse(hasLocalSpools);
+      spools.forEach((spool, index) => {
+        const spoolRef = db.collection('users').doc(userId).collection('spools').doc(`spool_${Date.now()}_${index}`);
+        batch.set(spoolRef, {
+          ...spool,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      console.log(`Migrating ${spools.length} spools...`);
+    }
+    
+    // Migrate usage history
+    if (hasLocalHistory) {
+      const history = JSON.parse(hasLocalHistory);
+      history.forEach((job, index) => {
+        const historyRef = db.collection('users').doc(userId).collection('history').doc(`job_${Date.now()}_${index}`);
+        batch.set(historyRef, job);
+      });
+      console.log(`Migrating ${history.length} history entries...`);
+    }
+    
+    // Migrate empty spools
+    if (hasLocalEmptySpools) {
+      const emptySpools = JSON.parse(hasLocalEmptySpools);
+      emptySpools.forEach((spool, index) => {
+        const emptySpoolRef = db.collection('users').doc(userId).collection('emptySpools').doc(`empty_${Date.now()}_${index}`);
+        batch.set(emptySpoolRef, spool);
+      });
+      console.log(`Migrating ${emptySpools.length} empty spools...`);
+    }
+    
+    // Migrate materials list
+    if (hasLocalMaterials) {
+      const materials = JSON.parse(hasLocalMaterials);
+      const materialsRef = db.collection('users').doc(userId);
+      batch.update(materialsRef, { materialsList: materials });
+      console.log(`Migrating materials list...`);
+    }
+    
+    // Commit the batch
+    await batch.commit();
+    console.log('✅ Migration complete!');
+    
+    // Clear localStorage after successful migration
+    localStorage.removeItem('spoolLibrary');
+    localStorage.removeItem('usageHistory');
+    localStorage.removeItem('emptySpools');
+    localStorage.removeItem('materialsList');
+    
+    alert('Your data has been migrated to the cloud! 🎉');
+  } catch (error) {
+    console.error('Migration error:', error);
+    alert('Data migration failed. Your local data is still safe in localStorage.');
+  }
+}
+// ===== END MIGRATION =====
+
 
 // ----- Data Storage -----
 let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
@@ -50,6 +382,21 @@ function showScreen(id) {
   if (id === "materials") {
     renderMaterialsList(); // Render materials list when opening materials screen
   }
+  if (id === "settings") {
+  // Update spool count
+  const spoolCount = document.getElementById("spoolCount");
+  if (spoolCount) {
+    const count = spoolLibrary.length;
+    const limit = isProUser() ? "∞" : "25";
+    spoolCount.innerHTML = `<strong>Spools:</strong> ${count} / ${limit}`;
+    
+    // Warning if near limit
+    if (count >= 20 && !isProUser()) {
+      spoolCount.style.color = "#ff6b6b";
+      spoolCount.innerHTML += ` <small>(${25 - count} remaining)</small>`;
+    }
+  }
+}
 }
 
 // ----- Material Management Functions -----
@@ -289,6 +636,12 @@ function handleColorTypeChange() {
 
 // ----- Save Spool -----
 function saveSpool() {
+    // Check spool limit for free users
+  if (spoolLibrary.length >= 25 && !isProUser()) {
+    alert('Free tier limit: 25 spools maximum.\n\n🔓 Upgrade to Pro for unlimited spools!\n\n(Subscription options coming soon!)');
+    return;
+  }
+
   const brand = document.getElementById("brand").value.trim();
   const color = document.getElementById("color").value.trim();
 
