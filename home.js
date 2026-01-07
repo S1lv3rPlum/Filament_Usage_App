@@ -27,11 +27,7 @@ auth.onAuthStateChanged(async (user) => {
       console.error('Error loading subscription:', error);
     }
     
-    // Check for migration first
-    await checkAndMigrate();
-    
-    // Then load all data from Firebase
-    await loadUserData();
+    checkAndMigrate();
   }
 });
 
@@ -55,54 +51,6 @@ function isProUser() {
   }
   
   return false;
-}
-
-// Load all user data from Firebase
-async function loadUserData() {
-  if (!currentUser) return;
-  
-  console.log('Loading user data from Firebase...');
-  
-  try {
-    const userId = currentUser.uid;
-    
-    // Load spools
-    const spoolsSnapshot = await db.collection('users').doc(userId).collection('spools').get();
-    spoolLibrary = spoolsSnapshot.docs.map(doc => ({ 
-      firestoreId: doc.id, 
-      ...doc.data() 
-    }));
-    console.log(`Loaded ${spoolLibrary.length} spools`);
-    
-    // Load history
-    const historySnapshot = await db.collection('users').doc(userId).collection('history').get();
-    usageHistory = historySnapshot.docs.map(doc => ({ 
-      firestoreId: doc.id, 
-      ...doc.data() 
-    }));
-    console.log(`Loaded ${usageHistory.length} history entries`);
-    
-    // Load empty spools
-    const emptySpoolsSnapshot = await db.collection('users').doc(userId).collection('emptySpools').get();
-    emptySpoolsLibrary = emptySpoolsSnapshot.docs.map(doc => ({ 
-      firestoreId: doc.id, 
-      ...doc.data() 
-    }));
-    console.log(`Loaded ${emptySpoolsLibrary.length} empty spools`);
-    
-    // Load user settings (materials list)
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (userDoc.exists && userDoc.data().materialsList) {
-      materialsList = userDoc.data().materialsList;
-      console.log(`Loaded ${materialsList.length} materials`);
-    }
-    
-    console.log('✅ All data loaded from Firebase');
-    
-  } catch (error) {
-    console.error('Error loading user data:', error);
-    alert('Failed to load your data. Please refresh the page.');
-  }
 }
 
 // Logout function
@@ -386,10 +334,16 @@ async function checkAndMigrate() {
 
 
 // ----- Data Storage -----
-let spoolLibrary = [];
-let usageHistory = [];
-let materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
-let emptySpoolsLibrary = [];
+let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
+let usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
+  "PLA",
+  "ABS",
+  "PETG",
+  "Nylon",
+  "TPU",
+  "Custom"
+];
 
 let activePrintJob = null;
 let historyDisplayCount = 10;
