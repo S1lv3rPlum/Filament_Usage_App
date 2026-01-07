@@ -330,8 +330,56 @@ async function checkAndMigrate() {
     alert('Data migration failed. Your local data is still safe in localStorage.');
   }
 }
-// ===== END MIGRATION =====
+// ===== END AUTH CHECK =====
 
+// ===== LOAD DATA FROM FIREBASE =====
+async function loadUserData() {
+  if (!currentUser) return;
+  
+  console.log('Loading user data from Firebase...');
+  
+  try {
+    const userId = currentUser.uid;
+    
+    // Load spools
+    const spoolsSnapshot = await db.collection('users').doc(userId).collection('spools').get();
+    spoolLibrary = spoolsSnapshot.docs.map(doc => ({ 
+      firestoreId: doc.id, 
+      ...doc.data() 
+    }));
+    console.log(`✅ Loaded ${spoolLibrary.length} spools from Firebase`);
+    
+    // Load history
+    const historySnapshot = await db.collection('users').doc(userId).collection('history').get();
+    usageHistory = historySnapshot.docs.map(doc => ({ 
+      firestoreId: doc.id, 
+      ...doc.data() 
+    }));
+    console.log(`✅ Loaded ${usageHistory.length} history entries from Firebase`);
+    
+    // Load empty spools
+    const emptySpoolsSnapshot = await db.collection('users').doc(userId).collection('emptySpools').get();
+    emptySpoolsLibrary = emptySpoolsSnapshot.docs.map(doc => ({ 
+      firestoreId: doc.id, 
+      ...doc.data() 
+    }));
+    console.log(`✅ Loaded ${emptySpoolsLibrary.length} empty spools from Firebase`);
+    
+    // Load user settings (materials list)
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists && userDoc.data().materialsList) {
+      materialsList = userDoc.data().materialsList;
+      console.log(`✅ Loaded ${materialsList.length} materials from Firebase`);
+    }
+    
+    console.log('✅ All data loaded from Firebase successfully!');
+    
+  } catch (error) {
+    console.error('❌ Error loading user data:', error);
+    alert('Failed to load your data from the cloud. Please try refreshing the page.');
+  }
+}
+// ===== END LOAD DATA =====
 
 // ----- Data Storage -----
 let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
