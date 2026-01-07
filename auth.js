@@ -144,6 +144,102 @@ async function handleGoogleSignIn() {
     const result = await auth.signInWithPopup(provider);
     const user = result.user;
     
+    // Check if user document exists, create if not
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    
+    if (!userDoc.exists) {
+  await db.collection('users').doc(user.uid).set({
+    email: user.email,
+    displayName: user.displayName,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    accountType: 'free',  // Changed from 'personal'
+    subscription: {
+      status: 'free',
+      plan: 'free',
+      startDate: firebase.firestore.FieldValue.serverTimestamp(),
+      endDate: null,
+      provider: null,
+      transactionId: null
+    },
+    organizations: []
+  });
+}
+    
+    // User will be redirected by onAuthStateChanged listener
+  } catch (error) {
+    console.error('Google sign-in error:', error);
+    let message = 'Google sign-in failed. Please try again.';
+    
+    if (error.code === 'auth/popup-closed-by-user') {
+      message = 'Sign-in cancelled.';
+    } else if (error.code === 'auth/popup-blocked') {
+      message = 'Pop-up blocked. Please allow pop-ups and try again.';
+    }
+    
+    showError(message);
+    setLoading(false);
+  }
+}
+
+// Listen for auth state changes
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    console.log('User logged in:', user.email);
+    
+    // Check if this is first login (has localStorage data to migrate)
+    const hasLocalData = localStorage.getItem('spoolLibrary') || 
+                        localStorage.getItem('usageHistory') || 
+                        localStorage.getItem('emptySpools');
+    
+    if (hasLocalData) {
+      // Store flag to trigger migration on home page
+      sessionStorage.setItem('needsMigration', 'true');
+    }
+    
+    // Redirect to home page
+    window.location.href = 'home.html';
+  }
+});    startDate: firebase.firestore.FieldValue.serverTimestamp(),
+    endDate: null,
+    provider: null,
+    transactionId: null
+  },
+  organizations: []
+});
+    
+    // User will be redirected by onAuthStateChanged listener
+  } catch (error) {
+    console.error('Signup error:', error);
+    let message = 'Signup failed. Please try again.';
+    
+    if (error.code === 'auth/email-already-in-use') {
+      message = 'An account with this email already exists.';
+    } else if (error.code === 'auth/invalid-email') {
+      message = 'Invalid email address.';
+    } else if (error.code === 'auth/weak-password') {
+      message = 'Password should be at least 6 characters.';
+    }
+    
+    showError(message);
+    setLoading(false);
+  }
+}
+
+// Handle Google Sign-In
+async function handleGoogleSignIn() {
+  hideError();
+  setLoading(true);
+  
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account'  // Forces account picker every time
+  });
+
+  try {
+    const result = await auth.signInWithPopup(provider);
+    const user = result.user;
+    
    // Check if user document exists, create if not
 const userDoc = await db.collection('users').doc(user.uid).get();
 
