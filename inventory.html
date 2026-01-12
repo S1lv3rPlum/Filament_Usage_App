@@ -4,20 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Filament Tracker — Inventory</title>
+
   <link rel="stylesheet" href="style.css" />
-  <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#007acc" />
 </head>
+
 <body>
   <header>
     <h1>Filament Tracker</h1>
   </header>
+
   <main id="inventory">
     <h2>Spool Inventory</h2>
-    
-    <a href="emptyspools.html" class="menu-button">Manage Empty Spool Weights</a>
-      
-    <!-- Inventory Table -->
+
+    <a href="emptyspools.html" class="menu-button">
+      Manage Empty Spool Weights
+    </a>
+
     <section id="inventoryListSection" style="margin-top:20px;">
       <h3>Current Inventory</h3>
       <div class="table-wrapper">
@@ -34,15 +37,24 @@
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody><!-- rows injected dynamically --></tbody>
+          <tbody></tbody>
         </table>
       </div>
     </section>
+
     <div style="margin-top:20px;">
       <button onclick="smartBack()">⬅ Back</button>
     </div>
   </main>
+
   <footer id="footer">© Data Forge</footer>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
   <script src="inventory.js"></script>
 </body>
 </html>
