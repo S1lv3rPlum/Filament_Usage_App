@@ -1,37 +1,15 @@
-const CACHE_NAME = "filament-cache-v3"; // change version to force update
-const ASSETS = [
-  "/",
-  "/index.html",
-  "/style.css",
-  "/home.js",
-  "/home.html",
-  "/manifest.json",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png"
-];
+// DEV-SAFE SERVICE WORKER
+// This will NOT break auth, Firebase, or Codespaces
 
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+  // Activate immediately
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
+  event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("fetch", event => {
-  event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
-  );
-});
-
-self.addEventListener("message", event => {
-  if (event.data && event.data.action === "skipWaiting") {
-    self.skipWaiting();
-  }
-});
+// IMPORTANT:
+// Do NOT intercept fetch at all during development
+// Let the browser handle everything normally

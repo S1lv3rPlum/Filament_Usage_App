@@ -1,20 +1,99 @@
-// ----- Data Storage -----
-let spoolLibrary = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
-let materialsList = JSON.parse(localStorage.getItem("materialsList")) || [
-  "PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"
-];
+// ===== AUTH & FIREBASE CHECK =====
+let currentUser = null;
+let spoolLibrary = [];
+let materialsList = [];
+let emptySpoolsLibrary = [];
 
-function saveSpoolLibrary() {
-  localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
+// Wait for auth before loading
+auth.onAuthStateChanged(async (user) => {
+  if (!user) {
+    window.location.href = 'auth.html';
+  } else {
+    currentUser = user;
+    await loadInventoryData();
+    renderInventoryTable();
+  }
+});
+
+// Load data from Firebase
+async function loadInventoryData() {
+  if (!currentUser) return;
+  
+  try {
+    const userId = currentUser.uid;
+    
+    // Load spools
+    const spoolsSnapshot = await db.collection('users').doc(userId).collection('spools').get();
+    spoolLibrary = spoolsSnapshot.docs.map(doc => ({ 
+      firestoreId: doc.id, 
+      ...doc.data() 
+    }));
+    console.log(`✅ Loaded ${spoolLibrary.length} spools for inventory`);
+    
+    // Load empty spools
+    const emptySpoolsSnapshot = await db.collection('users').doc(userId).collection('emptySpools').get();
+    emptySpoolsLibrary = emptySpoolsSnapshot.docs.map(doc => ({ 
+      firestoreId: doc.id, 
+      ...doc.data() 
+    }));
+    
+    // Load materials
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists && userDoc.data().materialsList) {
+      materialsList = userDoc.data().materialsList;
+    } else {
+      materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
+    }
+    
+  } catch (error) {
+    console.error('Error loading inventory:', error);
+    alert('Failed to load inventory from cloud.');
+  }
 }
-function saveMaterialsList() {
-  localStorage.setItem("materialsList", JSON.stringify(materialsList));
+
+// Save spool to Firebase
+async function saveSpoolToFirebase(index) {
+  if (!currentUser) return;
+  
+  try {
+    const spool = spoolLibrary[index];
+    const firestoreId = spool.firestoreId;
+    
+    if (firestoreId) {
+      // Update existing spool in Firebase
+      const { firestoreId: _, createdAt, ...spoolData } = spool; // Remove Firestore metadata
+      await db.collection('users').doc(currentUser.uid)
+        .collection('spools').doc(firestoreId)
+        .update(spoolData);
+      console.log('✅ Spool updated in Firebase');
+      alert('Changes saved to cloud!');
+    }
+  } catch (error) {
+    console.error('Error saving spool:', error);
+    alert('Failed to save changes to cloud. Please try again.');
+  }
 }
+
+// Save materials list to Firebase
+async function saveMaterialsToFirebase() {
+  if (!currentUser) return;
+  
+  try {
+    await db.collection('users').doc(currentUser.uid).update({
+      materialsList: materialsList
+    });
+    console.log('✅ Materials saved to Firebase');
+  } catch (error) {
+    console.error('Error saving materials:', error);
+  }
+}
+
 function escapeHtml(s = "") {
   return s.replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
 }
+
 function smartBack() {
   try {
     if (document.referrer && new URL(document.referrer).origin === location.origin) {
@@ -28,19 +107,23 @@ window.smartBack = smartBack;
 
 // Helper to get empty spool label by ID
 function getEmptySpoolLabel(emptySpoolId) {
-  const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
-  const emptySpool = emptySpools[emptySpoolId];
+  if (emptySpoolId === null || emptySpoolId === undefined) return "None";
+  
+  const emptySpool = emptySpoolsLibrary[emptySpoolId];
   if (emptySpool) {
     return `${emptySpool.brand} - ${emptySpool.package} (${emptySpool.weight}g)`;
   }
-  return "";
+  
+  return "None";
 }
 
 // Helper to format color details for display
 function formatColorDetails(spool) {
   const details = [];
   
-  if (spool.colorType === "gradient" && spool.gradientColors) {
+  if (spool.colorType === "gradient" && spool.gradientBaseColors && Array.isArray(spool.gradientBaseColors)) {
+    details.push(`Gradient: ${spool.gradientBaseColors.join(", ")}`);
+  } else if (spool.colorType === "gradient" && spool.gradientColors) {
     details.push(`Gradient: ${spool.gradientColors}`);
   } else if (spool.colorType) {
     details.push(`Type: ${spool.colorType}`);
@@ -50,7 +133,7 @@ function formatColorDetails(spool) {
     details.push(`Sheen: ${spool.sheen}`);
   }
   
-  if (spool.glowInDark) {
+  if (spool.glowInDark && spool.glowInDark !== "no") {
     details.push("Glow in Dark");
   }
   
@@ -155,7 +238,6 @@ function buildMaterialSelectForRow(currentValue) {
 }
 
 function buildEmptySpoolSelectForRow(currentValue) {
-  const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
   const sel = document.createElement("select");
   sel.className = "row-empty-spool-select";
 
@@ -164,7 +246,7 @@ function buildEmptySpoolSelectForRow(currentValue) {
   noneOpt.textContent = "None";
   sel.appendChild(noneOpt);
 
-  emptySpools.forEach((spool, idx) => {
+  emptySpoolsLibrary.forEach((spool, idx) => {
     const opt = document.createElement("option");
     opt.value = idx;
     opt.textContent = `${spool.brand} - ${spool.package} (${spool.weight}g)`;
@@ -203,8 +285,12 @@ function buildColorDetailsEditFields(spool) {
   const gradientInput = document.createElement("input");
   gradientInput.type = "text";
   gradientInput.className = "row-gradient-colors";
-  gradientInput.placeholder = "Gradient colors";
-  gradientInput.value = spool.gradientColors || "";
+  gradientInput.placeholder = "Gradient colors (comma-separated)";
+  // Handle both array and string formats
+  const gradientValue = Array.isArray(spool.gradientBaseColors) 
+    ? spool.gradientBaseColors.join(", ") 
+    : (spool.gradientColors || "");
+  gradientInput.value = gradientValue;
   gradientInput.style.width = "100%";
   gradientInput.style.padding = "4px";
   gradientInput.style.marginBottom = "5px";
@@ -242,7 +328,7 @@ function buildColorDetailsEditFields(spool) {
   const glowCheckbox = document.createElement("input");
   glowCheckbox.type = "checkbox";
   glowCheckbox.className = "row-glow";
-  glowCheckbox.checked = spool.glowInDark || false;
+  glowCheckbox.checked = spool.glowInDark && spool.glowInDark !== "no";
   glowCheckbox.style.width = "auto";
   glowCheckbox.style.marginRight = "5px";
   
@@ -369,6 +455,9 @@ function currentRowValues(tr) {
   const emptySpoolValue = emptySpoolSel?.value || "";
   const emptySpoolId = emptySpoolValue === "" ? null : Number(emptySpoolValue);
 
+  // Parse gradient colors as array
+  const gradientColors = gradientEl?.value ? gradientEl.value.split(',').map(c => c.trim()).filter(Boolean) : [];
+
   return {
     brand: (brandEl?.value || "").trim(),
     color: (colorEl?.value || "").trim(),
@@ -376,9 +465,9 @@ function currentRowValues(tr) {
     length: parseFloat(lengthEl?.value) || 0,
     weight: parseFloat(weightEl?.value),
     colorType: colorTypeEl?.value || "solid",
-    gradientColors: gradientEl?.value?.trim() || "",
+    gradientBaseColors: gradientColors,
     sheen: sheenEl?.value || "",
-    glowInDark: glowEl?.checked || false,
+    glowInDark: glowEl?.checked ? "yes" : "no",
     texture: textureEl?.value || "",
     emptySpoolId: emptySpoolId,
   };
@@ -387,6 +476,11 @@ function currentRowValues(tr) {
 function hasChanges(tr) {
   const now = currentRowValues(tr);
   const orig = tr._orig || {};
+  
+  // Compare gradient arrays
+  const origGradient = Array.isArray(orig.gradientBaseColors) ? orig.gradientBaseColors.join(",") : "";
+  const nowGradient = Array.isArray(now.gradientBaseColors) ? now.gradientBaseColors.join(",") : "";
+  
   return (
     now.brand !== orig.brand ||
     now.color !== orig.color ||
@@ -394,9 +488,9 @@ function hasChanges(tr) {
     now.length !== (orig.length || 0) ||
     now.weight !== Number(orig.weight) ||
     now.colorType !== (orig.colorType || "solid") ||
-    now.gradientColors !== (orig.gradientColors || "") ||
+    nowGradient !== origGradient ||
     now.sheen !== (orig.sheen || "") ||
-    now.glowInDark !== (orig.glowInDark || false) ||
+    now.glowInDark !== (orig.glowInDark || "no") ||
     now.texture !== (orig.texture || "") ||
     now.emptySpoolId !== orig.emptySpoolId
   );
@@ -412,7 +506,7 @@ function onEditRow(e) {
 function onCancelRow(e) {
   exitEditMode(e.target.closest("tr"), false);
 }
-function onSaveRow(e) {
+async function onSaveRow(e) {
   const tr = e.target.closest("tr");
   if (!hasChanges(tr)) {
     exitEditMode(tr, true);
@@ -430,24 +524,23 @@ function onSaveRow(e) {
     return;
   }
 
+  // Add new material to list if needed
   if (!materialsList.includes(vals.material)) {
     const customIndex = materialsList.indexOf("Custom");
     const insertAt = customIndex === -1 ? materialsList.length : customIndex;
     materialsList.splice(insertAt, 0, vals.material);
-    saveMaterialsList();
+    await saveMaterialsToFirebase();
   }
 
-  // Keep the existing fullSpoolWeight and emptyWeight values
+  // Keep the existing fullSpoolWeight, emptyWeight, and firestoreId
   const existingSpool = spoolLibrary[idx];
   spoolLibrary[idx] = {
+    ...existingSpool,
     ...vals,
-    fullSpoolWeight: existingSpool.fullSpoolWeight,
-    emptyWeight: existingSpool.emptyWeight
   };
   
-  saveSpoolLibrary();
+  // Save to Firebase
+  await saveSpoolToFirebase(idx);
+  
   exitEditMode(tr, true);
 }
-
-// ----- Init -----
-document.addEventListener("DOMContentLoaded", renderInventoryTable);

@@ -1,10 +1,15 @@
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(() => console.log('Service Worker registered'))
+    .catch(err => console.log('Service Worker failed:', err));
+}
+
 // ===== AUTH CHECK - MUST BE AT TOP =====
 let currentUser = null;
+let userSubscription = null;
 
 console.log('Setting up auth listener...');
 console.log('auth object:', auth);
-
-let userSubscription = null;
 
 auth.onAuthStateChanged(async (user) => {
   console.log('Auth state changed! User:', user);
@@ -27,9 +32,8 @@ auth.onAuthStateChanged(async (user) => {
       console.error('Error loading subscription:', error);
     }
     
-    await checkAndMigrate();
+    // Load all user data from Firebase
     await loadUserData();
-
   }
 });
 
@@ -55,7 +59,7 @@ function isProUser() {
   return false;
 }
 
-// Load all user data from Firebase
+// ===== LOAD DATA FROM FIREBASE =====
 async function loadUserData() {
   if (!currentUser) return;
 
@@ -64,24 +68,13 @@ async function loadUserData() {
   try {
     const userId = currentUser.uid;
 
-    // Clear existing arrays first to avoid duplicates
-    spoolLibrary = [];
-    usageHistory = [];
-    emptySpoolsLibrary = [];
-    materialsList = [];
-
-    localStorage.removeItem('spoolLibrary');
-    localStorage.removeItem('usageHistory');
-    localStorage.removeItem('emptySpoolsLibrary');
-    localStorage.removeItem('materialsList');
-
     // Load spools
     const spoolsSnapshot = await db.collection('users').doc(userId).collection('spools').get();
     spoolLibrary = spoolsSnapshot.docs.map(doc => ({ 
       firestoreId: doc.id, 
       ...doc.data() 
     }));
-    console.log(`Loaded ${spoolLibrary.length} spools`);
+    console.log(`✅ Loaded ${spoolLibrary.length} spools from Firebase`);
 
     // Load history
     const historySnapshot = await db.collection('users').doc(userId).collection('history').get();
@@ -89,7 +82,7 @@ async function loadUserData() {
       firestoreId: doc.id, 
       ...doc.data() 
     }));
-    console.log(`Loaded ${usageHistory.length} history entries`);
+    console.log(`✅ Loaded ${usageHistory.length} history entries from Firebase`);
 
     // Load empty spools
     const emptySpoolsSnapshot = await db.collection('users').doc(userId).collection('emptySpools').get();
@@ -97,28 +90,26 @@ async function loadUserData() {
       firestoreId: doc.id, 
       ...doc.data() 
     }));
-    console.log(`Loaded ${emptySpoolsLibrary.length} empty spools`);
+    console.log(`✅ Loaded ${emptySpoolsLibrary.length} empty spools from Firebase`);
 
     // Load user settings (materials list)
     const userDoc = await db.collection('users').doc(userId).get();
     if (userDoc.exists && userDoc.data().materialsList) {
       materialsList = userDoc.data().materialsList;
-      console.log(`Loaded ${materialsList.length} materials`);
+      console.log(`✅ Loaded ${materialsList.length} materials from Firebase`);
+    } else {
+      // Set default materials if none exist
+      materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
     }
 
-    // ✅ Update localStorage with everything loaded
-    localStorage.setItem('spoolLibrary', JSON.stringify(spoolLibrary));
-    localStorage.setItem('usageHistory', JSON.stringify(usageHistory));
-    localStorage.setItem('emptySpoolsLibrary', JSON.stringify(emptySpoolsLibrary));
-    localStorage.setItem('materialsList', JSON.stringify(materialsList));
-
-    console.log('✅ All data loaded from Firebase');
+    console.log('✅ All data loaded from Firebase successfully!');
 
   } catch (error) {
-    console.error('Error loading user data:', error);
-    alert('Failed to load your data. Please refresh the page.');
+    console.error('❌ Error loading user data:', error);
+    alert('Failed to load your data from the cloud. Please try refreshing the page.');
   }
 }
+// ===== END LOAD DATA =====
 
 
 // Logout function
@@ -320,140 +311,12 @@ console.log("JS Loaded, showScreen is:", typeof showScreen);
 console.log("JS Loaded, showScreen is:", typeof showScreen);
 window.showScreen = showScreen;
 
-// ===== DATA MIGRATION FUNCTION =====
-async function checkAndMigrate() {
-  console.log('Checking for data migration...');
-  
-  // Check if there's localStorage data to migrate
-  const hasLocalSpools = localStorage.getItem('spoolLibrary');
-  const hasLocalHistory = localStorage.getItem('usageHistory');
-  const hasLocalEmptySpools = localStorage.getItem('emptySpools');
-  const hasLocalMaterials = localStorage.getItem('materialsList');
-  
-  if (!hasLocalSpools && !hasLocalHistory && !hasLocalEmptySpools && !hasLocalMaterials) {
-    console.log('No local data to migrate');
-    return;
-  }
-  
-  console.log('Local data found, migrating to Firebase...');
-  
-  try {
-    const batch = db.batch();
-    const userId = currentUser.uid;
-    
-    // Migrate spool library
-    if (hasLocalSpools) {
-      const spools = JSON.parse(hasLocalSpools);
-      spools.forEach((spool, index) => {
-        const spoolRef = db.collection('users').doc(userId).collection('spools').doc(`spool_${Date.now()}_${index}`);
-        batch.set(spoolRef, {
-          ...spool,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      });
-      console.log(`Migrating ${spools.length} spools...`);
-    }
-    
-    // Migrate usage history
-    if (hasLocalHistory) {
-      const history = JSON.parse(hasLocalHistory);
-      history.forEach((job, index) => {
-        const historyRef = db.collection('users').doc(userId).collection('history').doc(`job_${Date.now()}_${index}`);
-        batch.set(historyRef, job);
-      });
-      console.log(`Migrating ${history.length} history entries...`);
-    }
-    
-    // Migrate empty spools
-    if (hasLocalEmptySpools) {
-      const emptySpools = JSON.parse(hasLocalEmptySpools);
-      emptySpools.forEach((spool, index) => {
-        const emptySpoolRef = db.collection('users').doc(userId).collection('emptySpools').doc(`empty_${Date.now()}_${index}`);
-        batch.set(emptySpoolRef, spool);
-      });
-      console.log(`Migrating ${emptySpools.length} empty spools...`);
-    }
-    
-    // Migrate materials list
-    if (hasLocalMaterials) {
-      const materials = JSON.parse(hasLocalMaterials);
-      const materialsRef = db.collection('users').doc(userId);
-      batch.update(materialsRef, { materialsList: materials });
-      console.log(`Migrating materials list...`);
-    }
-    
-    // Commit the batch
-    await batch.commit();
-    console.log('✅ Migration complete!');
-    
-    // Clear localStorage after successful migration
-    localStorage.removeItem('spoolLibrary');
-    localStorage.removeItem('usageHistory');
-    localStorage.removeItem('emptySpools');
-    localStorage.removeItem('materialsList');
-    
-    alert('Your data has been migrated to the cloud! 🎉');
-  } catch (error) {
-    console.error('Migration error:', error);
-    alert('Data migration failed. Your local data is still safe in localStorage.');
-  }
-}
-// ===== END AUTH CHECK =====
-
-// ===== LOAD DATA FROM FIREBASE =====
-async function loadUserData() {
-  if (!currentUser) return;
-  
-  console.log('Loading user data from Firebase...');
-  
-  try {
-    const userId = currentUser.uid;
-    
-    // Load spools
-    const spoolsSnapshot = await db.collection('users').doc(userId).collection('spools').get();
-    spoolLibrary = spoolsSnapshot.docs.map(doc => ({ 
-      firestoreId: doc.id, 
-      ...doc.data() 
-    }));
-    console.log(`✅ Loaded ${spoolLibrary.length} spools from Firebase`);
-    
-    // Load history
-    const historySnapshot = await db.collection('users').doc(userId).collection('history').get();
-    usageHistory = historySnapshot.docs.map(doc => ({ 
-      firestoreId: doc.id, 
-      ...doc.data() 
-    }));
-    console.log(`✅ Loaded ${usageHistory.length} history entries from Firebase`);
-    
-    // Load empty spools
-    const emptySpoolsSnapshot = await db.collection('users').doc(userId).collection('emptySpools').get();
-    emptySpoolsLibrary = emptySpoolsSnapshot.docs.map(doc => ({ 
-      firestoreId: doc.id, 
-      ...doc.data() 
-    }));
-    console.log(`✅ Loaded ${emptySpoolsLibrary.length} empty spools from Firebase`);
-    
-    // Load user settings (materials list)
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (userDoc.exists && userDoc.data().materialsList) {
-      materialsList = userDoc.data().materialsList;
-      console.log(`✅ Loaded ${materialsList.length} materials from Firebase`);
-    }
-    
-    console.log('✅ All data loaded from Firebase successfully!');
-    
-  } catch (error) {
-    console.error('❌ Error loading user data:', error);
-    alert('Failed to load your data from the cloud. Please try refreshing the page.');
-  }
-}
-// ===== END LOAD DATA =====
 
 // ----- Data Storage -----
 let spoolLibrary = [];
 let usageHistory = [];
-let materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
-// `emptySpoolsLibrary` is declared further below and initialized from localStorage.
+let materialsList = [];
+let emptySpoolsLibrary = [];
 
 let activePrintJob = null;
 let historyDisplayCount = 10;
@@ -584,54 +447,67 @@ function loadBranding() {
   }
 }
 
-function addNewMaterial() {
+async function addNewMaterial() {
   const input = document.getElementById("newMaterialInput");
   const newMaterial = input.value.trim();
-  
+
   if (!newMaterial) {
     alert("Please enter a material name.");
     return;
   }
-  
+
   if (materialsList.includes(newMaterial)) {
     alert("This material already exists.");
     return;
   }
-  
+
   const customIndex = materialsList.indexOf("Custom");
   if (customIndex !== -1) {
     materialsList.splice(customIndex, 0, newMaterial);
   } else {
     materialsList.push(newMaterial);
   }
-  
-  localStorage.setItem("materialsList", JSON.stringify(materialsList));
+
+  await db.collection("users").doc(currentUser.uid).update({
+    materialsList: materialsList
+  });
+
   input.value = "";
   renderMaterialsList();
   alert(`Material "${newMaterial}" added!`);
 }
 
-function deleteMaterial(index) {
+
+async function deleteMaterial(index) {
   const material = materialsList[index];
-  
-  const spoolsUsingMaterial = spoolLibrary.filter(spool => spool.material === material);
-  
+
+  const spoolsUsingMaterial = spoolLibrary.filter(
+    spool => spool.material === material
+  );
+
   if (spoolsUsingMaterial.length > 0) {
-    alert(`Cannot delete "${material}" because ${spoolsUsingMaterial.length} spool(s) are using it. Please update or remove those spools first.`);
+    alert(`Cannot delete "${material}" because ${spoolsUsingMaterial.length} spool(s) are using it.`);
     return;
   }
-  
+
   if (confirm(`Delete material type "${material}"?`)) {
     materialsList.splice(index, 1);
-    localStorage.setItem("materialsList", JSON.stringify(materialsList));
+
+    await db.collection("users").doc(currentUser.uid).update({
+      materialsList: materialsList
+    });
+
     renderMaterialsList();
     alert(`Material "${material}" deleted.`);
   }
 }
 
+
 // ----- Material Dropdown -----
 function populateMaterialDropdown() {
   const select = document.getElementById("materialSelect");
+  if (!select) return;
+  
   select.innerHTML = "";
 
   materialsList.forEach(material => {
@@ -641,24 +517,65 @@ function populateMaterialDropdown() {
     select.appendChild(option);
   });
 
-  select.value = materialsList[0];
-  document.getElementById("customMaterialInput").classList.add("hidden");
-  document.getElementById("customMaterialInput").value = "";
+  // Add "Add New Material" option at the end
+  const addNewOpt = document.createElement("option");
+  addNewOpt.value = "add_new";
+  addNewOpt.textContent = "➕ Add New Material...";
+  select.appendChild(addNewOpt);
+
+  select.value = materialsList[0] || "";
 }
 
 function handleMaterialChange() {
   const select = document.getElementById("materialSelect");
   const customInput = document.getElementById("customMaterialInput");
-  if (select.value === "Custom") {
-    customInput.classList.remove("hidden");
+  
+  if (select.value === "add_new") {
+    // Show input for new material
+    const newMaterial = prompt("Enter new material name:");
+    if (newMaterial && newMaterial.trim()) {
+      const trimmedMaterial = newMaterial.trim();
+      
+      // Add to materials list if not already exists
+      if (!materialsList.includes(trimmedMaterial)) {
+        // Insert before "Custom" if it exists, otherwise at end
+        const customIndex = materialsList.indexOf("Custom");
+        if (customIndex !== -1) {
+          materialsList.splice(customIndex, 0, trimmedMaterial);
+        } else {
+          materialsList.push(trimmedMaterial);
+        }
+        
+        // Save to Firebase
+        if (currentUser) {
+          db.collection('users').doc(currentUser.uid).update({
+            materialsList: materialsList
+          }).then(() => {
+            console.log('New material saved to Firebase');
+          }).catch(err => {
+            console.error('Error saving material:', err);
+          });
+        }
+        
+        // Repopulate dropdown and select the new material
+        populateMaterialDropdown();
+        select.value = trimmedMaterial;
+      } else {
+        // Material already exists, just select it
+        select.value = trimmedMaterial;
+      }
+    } else {
+      // User cancelled or entered empty, reset to first option
+      select.value = materialsList[0] || "";
+    }
+    
+    customInput.classList.add("hidden");
+    customInput.value = "";
   } else {
     customInput.classList.add("hidden");
     customInput.value = "";
   }
 }
-
-// ----- Data Storage for Empty Spools -----
-let emptySpoolsLibrary = JSON.parse(localStorage.getItem("emptySpools")) || [];
 
 // ----- Populate dropdown -----
 function populateEmptySpoolDropdown() {
@@ -707,8 +624,7 @@ function calculateFilamentAmount() {
   let emptyWeight = 0;
   
   if (emptySpoolSelect.value !== "" && emptySpoolSelect.value !== "other") {
-    const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
-    const selectedSpool = emptySpools[emptySpoolSelect.value];
+    const selectedSpool = emptySpoolsLibrary[emptySpoolSelect.value];
     if (selectedSpool) {
       emptyWeight = selectedSpool.weight;
     }
@@ -745,8 +661,8 @@ function handleColorTypeChange() {
 }
 
 // ----- Save Spool -----
-function saveSpool() {
-    // Check spool limit for free users
+async function saveSpool() {
+  // Check spool limit for free users
   if (spoolLibrary.length >= 25 && !isProUser()) {
     alert('Free tier limit: 25 spools maximum.\n\n🔓 Upgrade to Pro for unlimited spools!\n\n(Subscription options coming soon!)');
     return;
@@ -755,24 +671,14 @@ function saveSpool() {
   const brand = document.getElementById("brand").value.trim();
   const color = document.getElementById("color").value.trim();
 
-  const materialSelect = document.getElementById("materialSelect");
-  let material = materialSelect.value;
+ const materialSelect = document.getElementById("materialSelect");
+let material = materialSelect.value;
 
-  const customMaterialInput = document.getElementById("customMaterialInput");
-  const customMaterial = customMaterialInput.value.trim();
-
-  if (material === "Custom") {
-    if (!customMaterial) {
-      alert("Please enter a custom material.");
-      return;
-    }
-    material = customMaterial;
-
-    if (!materialsList.includes(material)) {
-      materialsList.splice(materialsList.length - 1, 0, material);
-      localStorage.setItem("materialsList", JSON.stringify(materialsList));
-    }
-  }
+// Validate material selection
+if (!material || material === "add_new") {
+  alert("Please select a material.");
+  return;
+}
 
   const lengthInput = document.getElementById("length").value;
   const length = lengthInput ? parseFloat(lengthInput) : 0;
@@ -786,17 +692,13 @@ function saveSpool() {
     : Number(emptySpoolSelect.value);
   
   let emptyWeight = 0;
-  if (emptySpoolId !== null) {
-    const emptySpools = JSON.parse(localStorage.getItem("emptySpools")) || [];
-    const selectedSpool = emptySpools[emptySpoolId];
-    if (selectedSpool) {
-      emptyWeight = selectedSpool.weight;
-    }
+  if (emptySpoolId !== null && emptySpoolsLibrary[emptySpoolId]) {
+    emptyWeight = emptySpoolsLibrary[emptySpoolId].weight;
   }
   
   const weight = fullSpoolWeight - emptyWeight;
 
-// Get color details
+  // Get color details
   const colorType = document.getElementById("colorType").value;
   let baseColor = "";
   let gradientBaseColors = [];
@@ -824,7 +726,7 @@ function saveSpool() {
     return;
   }
 
-if (colorType === "solid" && !baseColor) {
+  if (colorType === "solid" && !baseColor) {
     alert("Please select a base color.");
     return;
   }
@@ -839,7 +741,8 @@ if (colorType === "solid" && !baseColor) {
     return;
   }
 
-spoolLibrary.push({ 
+  // Create spool object
+  const newSpool = { 
     brand, 
     color, 
     material, 
@@ -848,36 +751,52 @@ spoolLibrary.push({
     emptyWeight: emptySpoolId !== null ? emptyWeight : 0,
     fullSpoolWeight,
     emptySpoolId,
-    // Color details
     colorType,
     baseColor: colorType === "solid" ? baseColor : "",
     gradientBaseColors: colorType === "gradient" ? gradientBaseColors : [],
     sheen,
     glowInDark,
-    texture
-  });
-  localStorage.setItem("spoolLibrary", JSON.stringify(spoolLibrary));
+    texture,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
 
-  // Reset form
-  document.getElementById("brand").value = "";
-  document.getElementById("color").value = "";
-  populateMaterialDropdown();
-  document.getElementById("length").value = "";
-  document.getElementById("fullSpoolWeight").value = "";
-  document.getElementById("filamentAmountDisplay").style.display = "none";
-  populateEmptySpoolDropdown();
-  // Reset color details
-  document.getElementById("colorType").value = "solid";
-  document.getElementById("baseColorSolid").value = "";
-  document.querySelectorAll('input[name="gradientColors"]').forEach(cb => cb.checked = false);
-  handleColorTypeChange(); // Reset visibility
-  document.getElementById("sheen").value = "";
-  document.querySelector('input[name="glowInDark"][value="no"]').checked = true;
-  document.getElementById("texture").value = "";
+  try {
+    // Save to Firebase
+    const docRef = await db.collection('users').doc(currentUser.uid).collection('spools').add(newSpool);
+    
+    // Add to local array with Firestore ID
+    spoolLibrary.push({
+      firestoreId: docRef.id,
+      ...newSpool,
+      createdAt: new Date() // Use local timestamp for immediate display
+    });
 
-  const savedWeight = emptySpoolId !== null ? weight.toFixed(2) : fullSpoolWeight.toFixed(2);
-  alert(`Spool saved! ${emptySpoolId !== null ? 'Filament amount: ' : 'Weight: '}${savedWeight}g`);
-  showScreen("library");
+    console.log('✅ Spool saved to Firebase');
+
+    // Reset form
+    document.getElementById("brand").value = "";
+    document.getElementById("color").value = "";
+    populateMaterialDropdown();
+    document.getElementById("length").value = "";
+    document.getElementById("fullSpoolWeight").value = "";
+    document.getElementById("filamentAmountDisplay").style.display = "none";
+    populateEmptySpoolDropdown();
+    document.getElementById("colorType").value = "solid";
+    document.getElementById("baseColorSolid").value = "";
+    document.querySelectorAll('input[name="gradientColors"]').forEach(cb => cb.checked = false);
+    handleColorTypeChange();
+    document.getElementById("sheen").value = "";
+    document.querySelector('input[name="glowInDark"][value="no"]').checked = true;
+    document.getElementById("texture").value = "";
+
+    const savedWeight = emptySpoolId !== null ? weight.toFixed(2) : fullSpoolWeight.toFixed(2);
+    alert(`Spool saved to cloud! ${emptySpoolId !== null ? 'Filament amount: ' : 'Weight: '}${savedWeight}g`);
+    showScreen("library");
+
+  } catch (error) {
+    console.error('Error saving spool:', error);
+    alert('Failed to save spool to cloud. Please try again.');
+  }
 }
 
 // ----- Render Library -----
@@ -919,8 +838,7 @@ function renderHistory() {
 }
 
 function renderHistoryFiltered(defaultLastTen = false) {
-  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
-
+ 
   const startDateVal = document.getElementById("filterStartDate")?.value || "";
   const endDateVal = document.getElementById("filterEndDate")?.value || "";
   const spoolLabel = document.getElementById("filterSpool")?.value || "";
@@ -1209,115 +1127,161 @@ function showEndPrintSection() {
   });
 }
 
-function endPrintJob() {
-  const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
-
-  const updatedSpools = activePrintJob.spools.map(spoolData => {
-    const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
-    let endWeight;
-    
-    if (endWeightInput && endWeightInput.trim() !== "") {
-      endWeight = parseFloat(endWeightInput);
-      if (isNaN(endWeight)) {
-        alert("Invalid weight entered. Please check your inputs.");
-        throw new Error("Invalid end weight");
+async function endPrintJob() {
+  try {
+    const updatedSpools = activePrintJob.spools.map(spoolData => {
+      const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
+      let endWeight;
+      
+      if (endWeightInput && endWeightInput.trim() !== "") {
+        endWeight = parseFloat(endWeightInput);
+        if (isNaN(endWeight)) {
+          alert("Invalid weight entered. Please check your inputs.");
+          throw new Error("Invalid end weight");
+        }
+      } else if (spoolData.estimatedWeight) {
+        endWeight = spoolData.startWeight - spoolData.estimatedWeight;
+      } else {
+        alert("Please enter final weight for all spools (or provide estimated usage when starting print).");
+        throw new Error("Missing end weights");
       }
-    } else if (spoolData.estimatedWeight) {
-      endWeight = spoolData.startWeight - spoolData.estimatedWeight;
-    } else {
-      alert("Please enter final weight for all spools (or provide estimated usage when starting print).");
-      throw new Error("Missing end weights");
-    }
-    
-    const gramsUsed = spoolData.startWeight - endWeight;
+      
+      const gramsUsed = spoolData.startWeight - endWeight;
+      const spoolIndex = parseInt(spoolData.spoolId, 10);
 
-    const spoolIndex = parseInt(spoolData.spoolId, 10);
-    if (spoolIndex !== -1) {
-      spools[spoolIndex].weight = endWeight;
-    }
+      // Update spool weight in local array
+      if (spoolIndex !== -1 && spoolLibrary[spoolIndex]) {
+        spoolLibrary[spoolIndex].weight = endWeight;
+        
+        // Update in Firebase
+        if (spoolLibrary[spoolIndex].firestoreId) {
+          db.collection('users').doc(currentUser.uid)
+            .collection('spools').doc(spoolLibrary[spoolIndex].firestoreId)
+            .update({ weight: endWeight })
+            .catch(err => console.error('Error updating spool weight:', err));
+        }
+      }
 
-    return {
-      ...spoolData,
-      endWeight,
-      gramsUsed,
-      used: gramsUsed,
+      return {
+        ...spoolData,
+        endWeight,
+        gramsUsed,
+        used: gramsUsed,
+      };
+    });
+
+    // Create history entry
+    const historyEntry = {
+      jobId: activePrintJob.jobId,
+      jobName: activePrintJob.jobName,
+      spools: updatedSpools,
+      startTime: activePrintJob.startTime,
+      endTime: new Date().toISOString(),
+      status: "success"
     };
-  });
 
-  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
+    // Save to Firebase
+    const docRef = await db.collection('users').doc(currentUser.uid).collection('history').add(historyEntry);
+    
+    // Add to local array
+    usageHistory.push({
+      firestoreId: docRef.id,
+      ...historyEntry
+    });
 
-  history.push({
-    jobId: activePrintJob.jobId,
-    jobName: activePrintJob.jobName,
-    spools: updatedSpools,
-    startTime: activePrintJob.startTime,
-    endTime: new Date().toISOString(),
-    status: "success"
-  });
+    // Clear active job
+    localStorage.removeItem("activePrintJob");
+    activePrintJob = null;
 
-  localStorage.setItem("usageHistory", JSON.stringify(history));
-  localStorage.removeItem("activePrintJob");
-  activePrintJob = null;
+    console.log('✅ Print job saved to Firebase');
+    alert("Print job ended and usage recorded in cloud.");
+    showScreen("home");
 
-  alert("Print job ended and usage recorded.");
-  showScreen("home");
+  } catch (error) {
+    console.error('Error ending print job:', error);
+    if (error.message !== "Invalid end weight" && error.message !== "Missing end weights") {
+      alert('Failed to save print job. Please try again.');
+    }
+  }
 }
 
-function failedPrintJob() {
+async function failedPrintJob() {
   if (!confirm("Mark this print as failed? You must weigh your spools and enter the actual final weights.")) {
     return;
   }
   
-  const spools = JSON.parse(localStorage.getItem("spoolLibrary")) || [];
-  const history = JSON.parse(localStorage.getItem("usageHistory")) || [];
+  try {
+    const updatedSpools = activePrintJob.spools.map(spoolData => {
+      const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
+      
+      if (!endWeightInput || endWeightInput.trim() === "") {
+        alert("For failed prints, you must weigh and enter the actual final weight for all spools.");
+        throw new Error("Missing end weights for failed print");
+      }
+      
+      const endWeight = parseFloat(endWeightInput);
+      if (isNaN(endWeight)) {
+        alert("Invalid weight entered. Please check your inputs.");
+        throw new Error("Invalid end weight");
+      }
+      
+      const gramsUsed = spoolData.startWeight - endWeight;
+      const spoolIndex = parseInt(spoolData.spoolId, 10);
 
-  const updatedSpools = activePrintJob.spools.map(spoolData => {
-    const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
-    
-    if (!endWeightInput || endWeightInput.trim() === "") {
-      alert("For failed prints, you must weigh and enter the actual final weight for all spools.");
-      throw new Error("Missing end weights for failed print");
-    }
-    
-    const endWeight = parseFloat(endWeightInput);
-    if (isNaN(endWeight)) {
-      alert("Invalid weight entered. Please check your inputs.");
-      throw new Error("Invalid end weight");
-    }
-    
-    const gramsUsed = spoolData.startWeight - endWeight;
+      // Update spool weight in local array
+      if (spoolIndex !== -1 && spoolLibrary[spoolIndex]) {
+        spoolLibrary[spoolIndex].weight = endWeight;
+        
+        // Update in Firebase
+        if (spoolLibrary[spoolIndex].firestoreId) {
+          db.collection('users').doc(currentUser.uid)
+            .collection('spools').doc(spoolLibrary[spoolIndex].firestoreId)
+            .update({ weight: endWeight })
+            .catch(err => console.error('Error updating spool weight:', err));
+        }
+      }
 
-    const spoolIndex = parseInt(spoolData.spoolId, 10);
-    if (spoolIndex !== -1) {
-      spools[spoolIndex].weight = endWeight;
-    }
+      return {
+        ...spoolData,
+        endWeight,
+        gramsUsed,
+        used: gramsUsed,
+      };
+    });
 
-    return {
-      ...spoolData,
-      endWeight,
-      gramsUsed,
-      used: gramsUsed,
+    // Create history entry
+    const historyEntry = {
+      jobId: activePrintJob.jobId,
+      jobName: `FAILED: ${activePrintJob.jobName}`,
+      spools: updatedSpools,
+      startTime: activePrintJob.startTime,
+      endTime: new Date().toISOString(),
+      status: "failed"
     };
-  });
 
-  localStorage.setItem("spoolLibrary", JSON.stringify(spools));
+    // Save to Firebase
+    const docRef = await db.collection('users').doc(currentUser.uid).collection('history').add(historyEntry);
+    
+    // Add to local array
+    usageHistory.push({
+      firestoreId: docRef.id,
+      ...historyEntry
+    });
 
-  history.push({
-    jobId: activePrintJob.jobId,
-    jobName: `FAILED: ${activePrintJob.jobName}`,
-    spools: updatedSpools,
-    startTime: activePrintJob.startTime,
-    endTime: new Date().toISOString(),
-    status: "failed"
-  });
+    // Clear active job
+    localStorage.removeItem("activePrintJob");
+    activePrintJob = null;
 
-  localStorage.setItem("usageHistory", JSON.stringify(history));
-  localStorage.removeItem("activePrintJob");
-  activePrintJob = null;
+    console.log('✅ Failed print saved to Firebase');
+    alert("Failed print recorded. Spool weights updated in cloud.");
+    showScreen("home");
 
-  alert("Failed print recorded. Spool weights updated.");
-  showScreen("home");
+  } catch (error) {
+    console.error('Error recording failed print:', error);
+    if (error.message !== "Invalid end weight" && error.message !== "Missing end weights for failed print") {
+      alert('Failed to save print job. Please try again.');
+    }
+  }
 }
 
 function cancelActiveJob() {
@@ -1382,7 +1346,7 @@ function populateHistorySpoolDropdown() {
 
   spoolSelect.innerHTML = '<option value="">All Spools</option>';
 
-  const usageHistory = JSON.parse(localStorage.getItem("usageHistory")) || [];
+ 
   const uniqueLabels = new Set();
 
   usageHistory.forEach(job => {
@@ -1462,29 +1426,32 @@ function closeEmptySpoolModal() {
   populateEmptySpoolDropdown();
 }
 
-function saveEmptySpoolFromModal() {
+async function saveEmptySpoolFromModal() {
   const brand = document.getElementById("modalEmptyBrand").value.trim();
   const packageType = document.getElementById("modalEmptyPackage").value.trim();
   const weight = parseFloat(document.getElementById("modalEmptyWeight").value);
-  
+
   if (!brand || !packageType || isNaN(weight)) {
     alert("Please fill out all fields.");
     return;
   }
-  
-  emptySpoolsLibrary.push({ brand: brand, package: packageType, weight: weight });
-  saveEmptySpoolsLibrary();
-  
-  // Clear inputs
-  document.getElementById("modalEmptyBrand").value = "";
-  document.getElementById("modalEmptyPackage").value = "";
-  document.getElementById("modalEmptyWeight").value = "";
-  
-  // Re-render list
+
+  const docRef = await db
+    .collection('users')
+    .doc(currentUser.uid)
+    .collection('emptySpools')
+    .add({ brand, package: packageType, weight });
+
+  emptySpoolsLibrary.push({
+    firestoreId: docRef.id,
+    brand,
+    package: packageType,
+    weight
+  });
+
   renderModalEmptySpoolList();
-  
-  alert("Empty spool saved!");
 }
+
 
 function renderModalEmptySpoolList() {
   const list = document.getElementById("modalEmptySpoolList");
@@ -1534,9 +1501,7 @@ function deleteEmptySpoolFromModal(index) {
   }
 }
 
-function saveEmptySpoolsLibrary() {
-  localStorage.setItem("emptySpools", JSON.stringify(emptySpoolsLibrary));
-}
+
 
 // Close modal when clicking outside of it
 window.addEventListener("click", (e) => {
