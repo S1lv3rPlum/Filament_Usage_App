@@ -3,6 +3,10 @@ let currentUser = null;
 let spoolLibrary = [];
 let materialsList = [];
 let emptySpoolsLibrary = [];
+let showingRetired = false;
+let showingOnlyLow = false;  
+let lowFilamentThreshold = 200 // Default threshold
+let spoolToRetire = null;
 
 // Wait for auth before loading
 auth.onAuthStateChanged(async (user) => {
@@ -45,6 +49,14 @@ async function loadInventoryData() {
       materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
     }
     
+    // Load low filament threshold
+    if (userDoc.exists && userDoc.data().lowFilamentThreshold !== undefined) {
+      lowFilamentThreshold = userDoc.data().lowFilamentThreshold;
+      console.log(`✅ Low filament threshold: ${lowFilamentThreshold}g`);
+    } else {
+      lowFilamentThreshold = 200;
+    }
+
   } catch (error) {
     console.error('Error loading inventory:', error);
     alert('Failed to load inventory from cloud.');
@@ -144,30 +156,95 @@ function formatColorDetails(spool) {
   return details.length > 0 ? details.join(", ") : "—";
 }
 
+// Toggle low spools filter
+function toggleLowSpools() {
+  showingOnlyLow = !showingOnlyLow;
+  const toggleBtn = document.getElementById("toggleLowBtn");
+  
+  if (showingOnlyLow) {
+    toggleBtn.textContent = "Show All Spools";
+    toggleBtn.style.background = "#ff9800";
+  } else {
+    toggleBtn.textContent = "Show Only Low Spools";
+    toggleBtn.style.background = "#ffc107";
+  }
+  
+  renderInventoryTable();
+}
+
+// Toggle retired spools visibility
+function toggleRetiredSpools() {
+  showingRetired = !showingRetired;
+  const retiredSection = document.getElementById("retiredSpoolsSection");
+  const toggleBtn = document.getElementById("toggleRetiredBtn");
+  
+  if (showingRetired) {
+    retiredSection.classList.remove("hidden");
+    toggleBtn.textContent = "Hide Retired Spools";
+    toggleBtn.style.background = "#007acc";
+    renderRetiredSpoolsTable();
+  } else {
+    retiredSection.classList.add("hidden");
+    toggleBtn.textContent = "Show Retired Spools";
+    toggleBtn.style.background = "#666";
+  }
+}
+
 // ----- Inventory table rendering & inline editing -----
 function renderInventoryTable() {
   const tbody = document.querySelector("#inventoryTable tbody");
   tbody.innerHTML = "";
 
-  if (spoolLibrary.length === 0) {
+  // Filter to only show active spools
+  const activeSpools = spoolLibrary.filter(spool => !spool.status || spool.status === "active");
+
+  // Further filter if showing only low spools
+  if (showingOnlyLow) {
+    activeSpools = activeSpools.filter(spool => spool.weight <= lowFilamentThreshold);
+  }
+
+  if (activeSpools.length === 0) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
     td.colSpan = 8;
-    td.textContent = "No spools in inventory";
+    td.textContent = "No active spools in inventory";
     tr.appendChild(td);
     tbody.appendChild(tr);
     return;
   }
 
-  spoolLibrary.forEach((spool, index) => {
+  activeSpools.forEach((spool) => {
+    const index = spoolLibrary.indexOf(spool);
     const tr = document.createElement("tr");
     tr.dataset.index = index;
+
+    // Determine alert level
+    const criticalThreshold = Math.floor(lowFilamentThreshold / 2);
+    let alertClass = "";
+    let alertStyle = "";
+    
+    if (spool.weight <= criticalThreshold) {
+      alertClass = "critical-low";
+      alertStyle = "background-color: #ffebee;"; // Light red
+    } else if (spool.weight <= lowFilamentThreshold) {
+      alertClass = "warning-low";
+      alertStyle = "background-color: #fff9e6;"; // Light yellow
+    }
+    
+    tr.className = alertClass;
+    if (alertStyle) {
+      tr.setAttribute("style", alertStyle);
+    }
 
     const emptySpoolDisplay = spool.emptySpoolId !== null && spool.emptySpoolId !== undefined 
       ? getEmptySpoolLabel(spool.emptySpoolId) 
       : "None";
 
     const colorDetails = formatColorDetails(spool);
+
+    // Bold weight if low
+    const weightStyle = spool.weight <= lowFilamentThreshold ? "font-weight: bold;" : "";
+
 
     tr.innerHTML = `
    <td class="cell-brand"><span>${escapeHtml(spool.brand)}</span></td>
@@ -181,6 +258,7 @@ function renderInventoryTable() {
      <button class="edit-btn">Edit</button>
      <button class="save-btn hidden">Save</button>
      <button class="cancel-btn hidden">Cancel</button>
+     <button class="retire-btn" style="background: #ff6b6b; margin-top: 5px;">Retire</button>
    </td>
 `;
 
@@ -188,6 +266,51 @@ function renderInventoryTable() {
   });
 
   attachRowHandlers();
+}
+
+// Render retired spools table
+function renderRetiredSpoolsTable() {
+  const tbody = document.querySelector("#retiredSpoolsTable tbody");
+  tbody.innerHTML = "";
+
+  // Filter to only show retired spools
+  const retiredSpools = spoolLibrary.filter(spool => spool.status === "retired");
+
+  if (retiredSpools.length === 0) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.textContent = "No retired spools";
+    td.style.color = "#666";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  retiredSpools.forEach((spool) => {
+    const index = spoolLibrary.indexOf(spool);
+    const tr = document.createElement("tr");
+    tr.style.opacity = "0.7";
+    tr.dataset.index = index;
+
+    const retiredDate = spool.retiredAt 
+      ? new Date(spool.retiredAt.toDate ? spool.retiredAt.toDate() : spool.retiredAt).toLocaleDateString()
+      : "Unknown";
+
+    tr.innerHTML = `
+      <td>${escapeHtml(spool.brand)}</td>
+      <td>${escapeHtml(spool.color)}</td>
+      <td>${escapeHtml(spool.material)}</td>
+      <td>${Number(spool.weight).toFixed(2)}g</td>
+      <td>${retiredDate}</td>
+      <td style="font-size: 0.9em;">${escapeHtml(spool.retirementReason || "—")}</td>
+      <td>
+        <button onclick="unretireSpool(${index})" style="background: #4CAF50; color: white; padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer;">Unretire</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+  });
 }
 
 function attachRowHandlers() {
@@ -200,7 +323,141 @@ function attachRowHandlers() {
   document.querySelectorAll(".cancel-btn").forEach(btn => {
     btn.addEventListener("click", onCancelRow);
   });
+  document.querySelectorAll(".retire-btn").forEach(btn => {
+    btn.addEventListener("click", onRetireRow);
+  });
 }
+
+// Open retirement modal
+function onRetireRow(e) {
+  const tr = e.target.closest("tr");
+  const index = Number(tr.dataset.index);
+  const spool = spoolLibrary[index];
+  
+  spoolToRetire = index;
+  
+  document.getElementById("retireSpoolName").textContent = 
+    `${spool.brand} - ${spool.color} (${spool.material})`;
+  
+  document.getElementById("retirementReason").value = "Empty";
+  document.getElementById("otherReasonContainer").classList.add("hidden");
+  document.getElementById("otherReason").value = "";
+  
+  document.getElementById("retirementModal").style.display = "block";
+}
+
+// Handle retirement reason change
+document.addEventListener("DOMContentLoaded", () => {
+  const reasonSelect = document.getElementById("retirementReason");
+  if (reasonSelect) {
+    reasonSelect.addEventListener("change", () => {
+      const otherContainer = document.getElementById("otherReasonContainer");
+      if (reasonSelect.value === "Other") {
+        otherContainer.classList.remove("hidden");
+      } else {
+        otherContainer.classList.add("hidden");
+      }
+    });
+  }
+});
+
+// Confirm retirement
+async function confirmRetirement() {
+  if (spoolToRetire === null) return;
+  
+  let reason = document.getElementById("retirementReason").value;
+  
+  if (reason === "Other") {
+    const otherReason = document.getElementById("otherReason").value.trim();
+    if (!otherReason) {
+      alert("Please specify a reason.");
+      return;
+    }
+    reason = otherReason;
+  }
+  
+  try {
+    const spool = spoolLibrary[spoolToRetire];
+    
+    // Update spool status
+    spool.status = "retired";
+    spool.retiredAt = firebase.firestore.FieldValue.serverTimestamp();
+    spool.retirementReason = reason;
+    
+    // Update in Firebase
+    if (spool.firestoreId) {
+      await db.collection('users').doc(currentUser.uid)
+        .collection('spools').doc(spool.firestoreId)
+        .update({
+          status: "retired",
+          retiredAt: firebase.firestore.FieldValue.serverTimestamp(),
+          retirementReason: reason
+        });
+      
+      console.log('✅ Spool retired in Firebase');
+      alert(`Spool retired successfully!\n\nReason: ${reason}`);
+      
+      closeRetirementModal();
+      renderInventoryTable();
+      
+      // If retired section is visible, update it
+      if (showingRetired) {
+        renderRetiredSpoolsTable();
+      }
+    }
+  } catch (error) {
+    console.error('Error retiring spool:', error);
+    alert('Failed to retire spool. Please try again.');
+  }
+}
+
+// Close retirement modal
+function closeRetirementModal() {
+  document.getElementById("retirementModal").style.display = "none";
+  spoolToRetire = null;
+}
+
+// Unretire a spool
+async function unretireSpool(index) {
+  if (!confirm("Restore this spool to active inventory?")) return;
+  
+  try {
+    const spool = spoolLibrary[index];
+    
+    // Update spool status
+    spool.status = "active";
+    delete spool.retiredAt;
+    delete spool.retirementReason;
+    
+    // Update in Firebase
+    if (spool.firestoreId) {
+      await db.collection('users').doc(currentUser.uid)
+        .collection('spools').doc(spool.firestoreId)
+        .update({
+          status: "active",
+          retiredAt: firebase.firestore.FieldValue.delete(),
+          retirementReason: firebase.firestore.FieldValue.delete()
+        });
+      
+      console.log('✅ Spool unretired in Firebase');
+      alert('Spool restored to active inventory!');
+      
+      renderInventoryTable();
+      renderRetiredSpoolsTable();
+    }
+  } catch (error) {
+    console.error('Error unretiring spool:', error);
+    alert('Failed to restore spool. Please try again.');
+  }
+}
+
+// Close modal when clicking outside
+window.addEventListener("click", (e) => {
+  const modal = document.getElementById("retirementModal");
+  if (e.target === modal) {
+    closeRetirementModal();
+  }
+});
 
 function buildMaterialSelectForRow(currentValue) {
   const sel = document.createElement("select");
@@ -396,6 +653,7 @@ function enterEditMode(tr) {
   tr.querySelector(".edit-btn").classList.add("hidden");
   tr.querySelector(".save-btn").classList.remove("hidden");
   tr.querySelector(".cancel-btn").classList.remove("hidden");
+  tr.querySelector(".retire-btn").classList.add("hidden");
 
   getRowInputs(tr).forEach(el => el.addEventListener("input", () => updateSaveVisibility(tr)));
   getRowInputs(tr).forEach(el => el.addEventListener("change", () => updateSaveVisibility(tr)));
@@ -422,6 +680,7 @@ function exitEditMode(tr, useLatest = true) {
   tr.querySelector(".edit-btn").classList.remove("hidden");
   tr.querySelector(".save-btn").classList.add("hidden");
   tr.querySelector(".cancel-btn").classList.add("hidden");
+  tr.querySelector(".retire-btn").classList.remove("hidden");
 
   delete tr._orig;
 }
@@ -432,115 +691,100 @@ function getRowInputs(tr) {
     tr.querySelector(".row-color"),
     tr.querySelector(".row-material-select"),
     tr.querySelector(".row-custom-material-input"),
-    tr.querySelector(".row-length"),
-    tr.querySelector(".row-weight"),
-    tr.querySelector(".row-color-type"),
-    tr.querySelector(".row-gradient-colors"),
-    tr.querySelector(".row-sheen"),
-    tr.querySelector(".row-glow"),
-    tr.querySelector(".row-texture"),
-    tr.querySelector(".row-empty-spool-select"),
-  ].filter(Boolean);
+tr.querySelector(".row-length"),
+tr.querySelector(".row-weight"),
+tr.querySelector(".row-color-type"),
+tr.querySelector(".row-gradient-colors"),
+tr.querySelector(".row-sheen"),
+tr.querySelector(".row-glow"),
+tr.querySelector(".row-texture"),
+tr.querySelector(".row-empty-spool-select"),
+].filter(Boolean);
 }
-
 function currentRowValues(tr) {
-  const [brandEl, colorEl, matSel, matCustom, lengthEl, weightEl, colorTypeEl, gradientEl, sheenEl, glowEl, textureEl, emptySpoolSel] = getRowInputs(tr);
-
-  let material = matSel ? matSel.value : "";
-  if (material === "Custom") {
-    const val = (matCustom?.value || "").trim();
-    material = val || "";
-  }
-
-  const emptySpoolValue = emptySpoolSel?.value || "";
-  const emptySpoolId = emptySpoolValue === "" ? null : Number(emptySpoolValue);
-
-  // Parse gradient colors as array
-  const gradientColors = gradientEl?.value ? gradientEl.value.split(',').map(c => c.trim()).filter(Boolean) : [];
-
-  return {
-    brand: (brandEl?.value || "").trim(),
-    color: (colorEl?.value || "").trim(),
-    material: (material || "").trim(),
-    length: parseFloat(lengthEl?.value) || 0,
-    weight: parseFloat(weightEl?.value),
-    colorType: colorTypeEl?.value || "solid",
-    gradientBaseColors: gradientColors,
-    sheen: sheenEl?.value || "",
-    glowInDark: glowEl?.checked ? "yes" : "no",
-    texture: textureEl?.value || "",
-    emptySpoolId: emptySpoolId,
-  };
+const [brandEl, colorEl, matSel, matCustom, lengthEl, weightEl, colorTypeEl, gradientEl, sheenEl, glowEl, textureEl, emptySpoolSel] = getRowInputs(tr);
+let material = matSel ? matSel.value : "";
+if (material === "Custom") {
+const val = (matCustom?.value || "").trim();
+material = val || "";
 }
-
+const emptySpoolValue = emptySpoolSel?.value || "";
+const emptySpoolId = emptySpoolValue === "" ? null : Number(emptySpoolValue);
+// Parse gradient colors as array
+const gradientColors = gradientEl?.value ? gradientEl.value.split(',').map(c => c.trim()).filter(Boolean) : [];
+return {
+brand: (brandEl?.value || "").trim(),
+color: (colorEl?.value || "").trim(),
+material: (material || "").trim(),
+length: parseFloat(lengthEl?.value) || 0,
+weight: parseFloat(weightEl?.value),
+colorType: colorTypeEl?.value || "solid",
+gradientBaseColors: gradientColors,
+sheen: sheenEl?.value || "",
+glowInDark: glowEl?.checked ? "yes" : "no",
+texture: textureEl?.value || "",
+emptySpoolId: emptySpoolId,
+};
+}
 function hasChanges(tr) {
-  const now = currentRowValues(tr);
-  const orig = tr._orig || {};
-  
-  // Compare gradient arrays
-  const origGradient = Array.isArray(orig.gradientBaseColors) ? orig.gradientBaseColors.join(",") : "";
-  const nowGradient = Array.isArray(now.gradientBaseColors) ? now.gradientBaseColors.join(",") : "";
-  
-  return (
-    now.brand !== orig.brand ||
-    now.color !== orig.color ||
-    now.material !== orig.material ||
-    now.length !== (orig.length || 0) ||
-    now.weight !== Number(orig.weight) ||
-    now.colorType !== (orig.colorType || "solid") ||
-    nowGradient !== origGradient ||
-    now.sheen !== (orig.sheen || "") ||
-    now.glowInDark !== (orig.glowInDark || "no") ||
-    now.texture !== (orig.texture || "") ||
-    now.emptySpoolId !== orig.emptySpoolId
-  );
+const now = currentRowValues(tr);
+const orig = tr._orig || {};
+// Compare gradient arrays
+const origGradient = Array.isArray(orig.gradientBaseColors) ? orig.gradientBaseColors.join(",") : "";
+const nowGradient = Array.isArray(now.gradientBaseColors) ? now.gradientBaseColors.join(",") : "";
+return (
+now.brand !== orig.brand ||
+now.color !== orig.color ||
+now.material !== orig.material ||
+now.length !== (orig.length || 0) ||
+now.weight !== Number(orig.weight) ||
+now.colorType !== (orig.colorType || "solid") ||
+nowGradient !== origGradient ||
+now.sheen !== (orig.sheen || "") ||
+now.glowInDark !== (orig.glowInDark || "no") ||
+now.texture !== (orig.texture || "") ||
+now.emptySpoolId !== orig.emptySpoolId
+);
 }
-
 function updateSaveVisibility(tr) {
-  tr.querySelector(".save-btn").classList.toggle("hidden", !hasChanges(tr));
+tr.querySelector(".save-btn").classList.toggle("hidden", !hasChanges(tr));
 }
-
 function onEditRow(e) {
-  enterEditMode(e.target.closest("tr"));
+enterEditMode(e.target.closest("tr"));
 }
 function onCancelRow(e) {
-  exitEditMode(e.target.closest("tr"), false);
+exitEditMode(e.target.closest("tr"), false);
 }
 async function onSaveRow(e) {
-  const tr = e.target.closest("tr");
-  if (!hasChanges(tr)) {
-    exitEditMode(tr, true);
-    return;
-  }
-  const idx = Number(tr.dataset.index);
-  const vals = currentRowValues(tr);
-
-  if (!vals.brand || !vals.color || !vals.material) {
-    alert("Brand, Color, and Material cannot be empty.");
-    return;
-  }
-  if (isNaN(vals.weight)) {
-    alert("Weight must be a number.");
-    return;
-  }
-
-  // Add new material to list if needed
-  if (!materialsList.includes(vals.material)) {
-    const customIndex = materialsList.indexOf("Custom");
-    const insertAt = customIndex === -1 ? materialsList.length : customIndex;
-    materialsList.splice(insertAt, 0, vals.material);
-    await saveMaterialsToFirebase();
-  }
-
-  // Keep the existing fullSpoolWeight, emptyWeight, and firestoreId
-  const existingSpool = spoolLibrary[idx];
-  spoolLibrary[idx] = {
-    ...existingSpool,
-    ...vals,
-  };
-  
-  // Save to Firebase
-  await saveSpoolToFirebase(idx);
-  
-  exitEditMode(tr, true);
+const tr = e.target.closest("tr");
+if (!hasChanges(tr)) {
+exitEditMode(tr, true);
+return;
+}
+const idx = Number(tr.dataset.index);
+const vals = currentRowValues(tr);
+if (!vals.brand || !vals.color || !vals.material) {
+alert("Brand, Color, and Material cannot be empty.");
+return;
+}
+if (isNaN(vals.weight)) {
+alert("Weight must be a number.");
+return;
+}
+// Add new material to list if needed
+if (!materialsList.includes(vals.material)) {
+const customIndex = materialsList.indexOf("Custom");
+const insertAt = customIndex === -1 ? materialsList.length : customIndex;
+materialsList.splice(insertAt, 0, vals.material);
+await saveMaterialsToFirebase();
+}
+// Keep the existing fullSpoolWeight, emptyWeight, and firestoreId
+const existingSpool = spoolLibrary[idx];
+spoolLibrary[idx] = {
+...existingSpool,
+...vals,
+};
+// Save to Firebase
+await saveSpoolToFirebase(idx);
+exitEditMode(tr, true);
 }

@@ -7,6 +7,7 @@ if ('serviceWorker' in navigator) {
 // ===== AUTH CHECK - MUST BE AT TOP =====
 let currentUser = null;
 let userSubscription = null;
+let lowFilamentThreshold = 200;  // NEW LINE
 
 console.log('Setting up auth listener...');
 console.log('auth object:', auth);
@@ -102,7 +103,22 @@ async function loadUserData() {
       materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
     }
 
+
+    // NEW CODE - Load low filament threshold
+    if (userDoc.exists && userDoc.data().lowFilamentThreshold !== undefined) {
+      lowFilamentThreshold = userDoc.data().lowFilamentThreshold;
+      console.log(`✅ Low filament threshold: ${lowFilamentThreshold}g`);
+    } else {
+      // Set default if not exists
+      lowFilamentThreshold = 200;
+      await db.collection('users').doc(userId).update({
+        lowFilamentThreshold: 200
+      });
+    }
+
     console.log('✅ All data loaded from Firebase successfully!');
+
+     updateLowFilamentBadge();  
 
   } catch (error) {
     console.error('❌ Error loading user data:', error);
@@ -333,6 +349,10 @@ function showScreen(id) {
     renderHistory();
   }
 
+   if (id === "home") {
+    updateLowFilamentBadge();  // NEW LINE
+  }
+
   if (id === "tracking") {
     populateSpoolMultiSelect();
 
@@ -368,6 +388,13 @@ function showScreen(id) {
       spoolCount.style.color = "#ff6b6b";
       spoolCount.innerHTML += ` <small>(${25 - count} remaining)</small>`;
     }
+// NEW CODE - Populate low filament threshold
+  const thresholdInput = document.getElementById("lowFilamentThreshold");
+  if (thresholdInput) {
+    thresholdInput.value = lowFilamentThreshold;
+  }
+
+
   }
 }
 }
@@ -502,6 +529,52 @@ async function deleteMaterial(index) {
   }
 }
 
+// Save low filament threshold
+async function saveLowFilamentThreshold() {
+  const input = document.getElementById("lowFilamentThreshold");
+  const newThreshold = parseInt(input.value);
+  
+  if (isNaN(newThreshold) || newThreshold < 10) {
+    alert("Please enter a valid threshold (minimum 10g).");
+    return;
+  }
+  
+  try {
+    await db.collection('users').doc(currentUser.uid).update({
+      lowFilamentThreshold: newThreshold
+    });
+    
+    lowFilamentThreshold = newThreshold;
+    console.log('✅ Low filament threshold saved:', newThreshold);
+    alert(`Alert settings saved!\n\n🟡 Yellow warning: ${newThreshold}g\n🔴 Red critical: ${Math.floor(newThreshold / 2)}g`);
+    
+  } catch (error) {
+    console.error('Error saving threshold:', error);
+    alert('Failed to save settings. Please try again.');
+  }
+}
+
+// Update low filament badge
+function updateLowFilamentBadge() {
+  const badge = document.getElementById("lowFilamentBadge");
+  const countSpan = document.getElementById("lowFilamentCount");
+  
+  if (!badge || !countSpan) return;
+  
+  // Count active spools below threshold
+  const lowSpools = spoolLibrary.filter(spool => {
+    const isActive = !spool.status || spool.status === "active";
+    const isLow = spool.weight <= lowFilamentThreshold;
+    return isActive && isLow;
+  });
+  
+  if (lowSpools.length > 0) {
+    countSpan.textContent = lowSpools.length;
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
 
 // ----- Material Dropdown -----
 function populateMaterialDropdown() {
@@ -741,7 +814,7 @@ if (!material || material === "add_new") {
     return;
   }
 
-  // Create spool object
+// Create spool object
   const newSpool = { 
     brand, 
     color, 
@@ -757,6 +830,7 @@ if (!material || material === "add_new") {
     sheen,
     glowInDark,
     texture,
+    status: "active",  // NEW LINE - Set default status
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
@@ -803,11 +877,17 @@ if (!material || material === "add_new") {
 function renderLibrary() {
   const list = document.getElementById("spoolList");
   list.innerHTML = "";
-  if (spoolLibrary.length === 0) {
+  
+  // Filter to only show active spools
+  const activeSpools = spoolLibrary.filter(spool => !spool.status || spool.status === "active");
+  
+  if (activeSpools.length === 0) {
     list.innerHTML = "<li>No spools in inventory</li>";
     return;
   }
-  spoolLibrary.forEach((spool, index) => {
+  
+  activeSpools.forEach((spool) => {
+    const index = spoolLibrary.indexOf(spool);
     const li = document.createElement("li");
     li.setAttribute('data-spool-id', index.toString());
     const lengthDisplay = spool.length > 0 ? `${spool.length}m, ` : '';
@@ -873,9 +953,14 @@ function renderHistoryFiltered(defaultLastTen = false) {
   filtered.forEach(job => {
     const li = document.createElement("li");
     const statusBadge = job.status === "failed" ? "❌ " : "";
-    let spoolDetails = job.spools.map(s =>
-      `<a href="#" class="spool-link" data-spool-index="${s.spoolId}">${s.spoolLabel}</a>: ${(s.used || 0).toFixed(2)} g used`
-    ).join("<br>");
+    let spoolDetails = job.spools.map(s => {
+      const spoolIndex = parseInt(s.spoolId, 10);
+      const spool = spoolLibrary[spoolIndex];
+      const isRetired = spool && spool.status === "retired";
+      const retiredBadge = isRetired ? ' <span style="color: #999; font-size: 0.85em;">(RETIRED)</span>' : '';
+      
+      return `<a href="#" class="spool-link" data-spool-index="${s.spoolId}">${s.spoolLabel}</a>${retiredBadge}: ${(s.used || 0).toFixed(2)} g used`;
+    }).join("<br>");
     li.innerHTML = `<strong>${statusBadge}${job.jobName}</strong> <small>(${new Date(job.startTime).toLocaleString()} → ${new Date(job.endTime).toLocaleString()})</small><br>${spoolDetails}`;
     list.appendChild(li);
   });
@@ -1041,7 +1126,21 @@ document.addEventListener("DOMContentLoaded", () => {
 function populateSpoolMultiSelect() {
   const select = document.getElementById("selectSpools");
   select.innerHTML = "";
-  spoolLibrary.forEach((spool, index) => {
+  
+  // Filter to only show active spools
+  const activeSpools = spoolLibrary.filter(spool => !spool.status || spool.status === "active");
+  
+  if (activeSpools.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No active spools available";
+    option.disabled = true;
+    select.appendChild(option);
+    return;
+  }
+  
+  activeSpools.forEach((spool) => {
+    const index = spoolLibrary.indexOf(spool);
     const option = document.createElement("option");
     option.value = index;
     option.textContent = `${spool.brand} - ${spool.color} (${spool.material}) (${spool.weight}g)`;

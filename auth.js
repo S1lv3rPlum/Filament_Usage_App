@@ -165,6 +165,44 @@ async function handleGoogleSignIn() {
   });
 }
     
+// In handleSignup function, update the user document creation:
+await db.collection('users').doc(user.uid).set({
+  email: user.email,
+  displayName: null,
+  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  accountType: 'free',
+  subscription: {
+    status: 'free',
+    plan: 'free',
+    startDate: firebase.firestore.FieldValue.serverTimestamp(),
+    endDate: null,
+    provider: null,
+    transactionId: null
+  },
+  organizations: [],
+  lowFilamentThreshold: 200  // NEW LINE
+});
+
+// In handleGoogleSignIn function, update the user document creation:
+if (!userDoc.exists) {
+  await db.collection('users').doc(user.uid).set({
+    email: user.email,
+    displayName: user.displayName,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    accountType: 'free',
+    subscription: {
+      status: 'free',
+      plan: 'free',
+      startDate: firebase.firestore.FieldValue.serverTimestamp(),
+      endDate: null,
+      provider: null,
+      transactionId: null
+    },
+    organizations: [],
+    lowFilamentThreshold: 200  // NEW LINE
+  });
+}
+
     // User will be redirected by onAuthStateChanged listener
   } catch (error) {
     console.error('Google sign-in error:', error);
