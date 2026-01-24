@@ -97,9 +97,9 @@ async function handleSignup(event) {
     // Create user document in Firestore
 await db.collection('users').doc(user.uid).set({
   email: user.email,
-  displayName: null,  // Email signups don't have displayName by default
+  displayName: null,
   createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-  accountType: 'free',  // Changed from 'personal'
+  accountType: 'free',
   subscription: {
     status: 'free',
     plan: 'free',
@@ -108,9 +108,11 @@ await db.collection('users').doc(user.uid).set({
     provider: null,
     transactionId: null
   },
-  organizations: []
+  organizations: [],
+  lowFilamentThreshold: 200,
+  currentWorkspace: 'personal',  // NEW
+  location: null  // NEW - will be set if they join a business
 });
-    
     // User will be redirected by onAuthStateChanged listener
   } catch (error) {
     console.error('Signup error:', error);
@@ -152,7 +154,7 @@ async function handleGoogleSignIn() {
     email: user.email,
     displayName: user.displayName,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    accountType: 'free',  // Changed from 'personal'
+    accountType: 'free',
     subscription: {
       status: 'free',
       plan: 'free',
@@ -161,7 +163,10 @@ async function handleGoogleSignIn() {
       provider: null,
       transactionId: null
     },
-    organizations: []
+    organizations: [],
+    lowFilamentThreshold: 200,
+    currentWorkspace: 'personal',  // NEW
+    location: null  // NEW
   });
 }
     

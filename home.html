@@ -13,7 +13,22 @@
   <header>
   <h1>Filament Foundry</h1>
   <p id="companyNameDisplay" style="font-size: 1em; margin-top: 5px; opacity: 0.95; font-weight: 600;"></p>
-  
+  <!-- Workspace Switcher -->
+<div id="workspaceSwitcher" style="text-align: center; margin: 10px 0; padding: 10px; background: #f0f4f8; border-radius: 8px;">
+  <div style="display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap;">
+    <span style="font-weight: 500; color: #666;">Workspace:</span>
+    <select id="workspaceSelect" onchange="switchWorkspace()" style="padding: 8px 12px; font-size: 1em; border-radius: 6px; border: 2px solid #007acc; background: white; cursor: pointer;">
+      <option value="personal">👤 Personal</option>
+    </select>
+    <button onclick="showCreateOrganizationModal()" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em;">
+      ➕ Create Business
+    </button>
+    <button onclick="showJoinOrganizationModal()" style="padding: 8px 16px; background: #007acc; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em;">
+      🔗 Join Business
+    </button>
+  </div>
+  <div id="workspaceInfo" style="margin-top: 8px; font-size: 0.85em; color: #666;"></div>
+</div>
 </header>
 
 <main id="home">
@@ -456,6 +471,55 @@
   </div>
 </div>
 
+<!-- Create Organization Modal -->
+<div id="createOrgModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 500px;">
+    <h2>Create Business Account</h2>
+    <p style="color: #666; margin-bottom: 20px;">Create a shared workspace for your team to manage inventory and track prints together.</p>
+    
+    <label for="orgName">Business Name:</label>
+    <input type="text" id="orgName" placeholder="e.g., My 3D Printing Shop" style="width: 100%; padding: 10px; margin-bottom: 15px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+    
+    <label for="orgLocation">Your Location/Identifier:</label>
+    <input type="text" id="orgLocation" placeholder="e.g., NY Office, Main Workshop" style="width: 100%; padding: 10px; margin-bottom: 20px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+    <small style="display: block; color: #666; margin-top: -15px; margin-bottom: 20px;">This helps differentiate your inventory from other team members.</small>
+    
+    <div style="background: #f0f4f8; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+      <strong>Free Business Tier Includes:</strong>
+      <ul style="margin: 10px 0; padding-left: 20px;">
+        <li>Up to 3 total members (you + 2 others)</li>
+        <li>25 spools total across entire team</li>
+        <li>100 print jobs in history</li>
+        <li>Shared inventory visibility</li>
+      </ul>
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+      <button onclick="createOrganization()" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">Create Business</button>
+      <button onclick="closeCreateOrgModal()" style="flex: 1; padding: 12px; background: #666; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Join Organization Modal -->
+<div id="joinOrgModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 500px;">
+    <h2>Join Business Account</h2>
+    <p style="color: #666; margin-bottom: 20px;">Enter the invite code provided by your business admin.</p>
+    
+    <label for="joinInviteCode">Invite Code:</label>
+    <input type="text" id="joinInviteCode" placeholder="Enter invite code" style="width: 100%; padding: 10px; margin-bottom: 15px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc; text-transform: uppercase;" />
+    
+    <label for="joinLocation">Your Location/Identifier:</label>
+    <input type="text" id="joinLocation" placeholder="e.g., FL Shop, Remote Office" style="width: 100%; padding: 10px; margin-bottom: 20px; font-size: 1em; border-radius: 4px; border: 1px solid #ccc;" />
+    
+    <div style="display: flex; gap: 10px;">
+      <button onclick="joinOrganization()" style="flex: 1; padding: 12px; background: #007acc; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">Join Business</button>
+      <button onclick="closeJoinOrgModal()" style="flex: 1; padding: 12px; background: #666; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -463,5 +527,6 @@
 
 <script src="firebase-config.js"></script>
 <script src="home.js"></script>
+
 </body>
 </html>
