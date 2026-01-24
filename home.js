@@ -546,7 +546,11 @@ async function saveLowFilamentThreshold() {
     
     lowFilamentThreshold = newThreshold;
     console.log('✅ Low filament threshold saved:', newThreshold);
-    alert(`Alert settings saved!\n\n🟡 Yellow warning: ${newThreshold}g\n🔴 Red critical: ${Math.floor(newThreshold / 2)}g`);
+    
+    // Update the badge immediately
+    updateLowFilamentBadge();
+    
+    alert(`Alert settings saved!\n\n🟡 Yellow warning: ${newThreshold}g\n🔴 Red critical: ${Math.floor(newThreshold / 2)}g\n\nInventory page will update when you navigate to it.`);
     
   } catch (error) {
     console.error('Error saving threshold:', error);
