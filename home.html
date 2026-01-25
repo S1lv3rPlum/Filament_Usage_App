@@ -405,6 +405,36 @@
   </div>
 </div>
 
+<!-- Business Management Section -->
+<div id="businessManagementSection" class="hidden" style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+  <h3>Business Account Management</h3>
+  
+  <div id="businessInfo" style="background: #f0f4f8; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+    <p style="margin: 0 0 10px 0;"><strong>Business Name:</strong> <span id="bizName">—</span></p>
+    <p style="margin: 0 0 10px 0;"><strong>Your Role:</strong> <span id="bizRole">—</span></p>
+    <p style="margin: 0 0 10px 0;"><strong>Your Location:</strong> <span id="bizLocation">—</span></p>
+    <p style="margin: 0 0 10px 0;"><strong>Plan:</strong> <span id="bizPlan">—</span></p>
+    <p style="margin: 0;"><strong>Members:</strong> <span id="bizMemberCount">—</span></p>
+  </div>
+  
+  <div id="inviteCodeSection" class="hidden" style="background: #fff3cd; border: 2px solid #ffc107; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+    <h4 style="margin-top: 0;">Invite Code</h4>
+    <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Share this code with team members so they can join your business.</p>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <input type="text" id="inviteCodeDisplay" readonly style="flex: 1; padding: 10px; font-size: 1.2em; font-weight: bold; text-align: center; border: 2px solid #007acc; border-radius: 4px; background: white;" />
+      <button onclick="copyInviteCode()" style="padding: 10px 20px; background: #007acc; color: white; border: none; border-radius: 6px; cursor: pointer;">Copy</button>
+    </div>
+  </div>
+  
+  <button onclick="showBusinessManagementModal()" style="width: 100%; padding: 12px; background: #007acc; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; margin-bottom: 10px;">
+    Manage Members
+  </button>
+  
+  <button onclick="leaveBusinessConfirm()" style="width: 100%; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">
+    Leave Business
+  </button>
+</div>
+
   <!-- Data Management -->
 <div style="margin: 20px 0; padding: 15px; background: white; border-radius: 8px;">
   <h3>Data Management</h3>

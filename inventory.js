@@ -26,8 +26,67 @@ async function loadInventoryData() {
   try {
     const userId = currentUser.uid;
     
+    // Load user document first to get workspace info
+    const userDoc = await db.collection('users').doc(userId).get();
+    let currentWorkspace = 'personal';
+    let activeOrganization = null;
+    
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      currentWorkspace = userData.currentWorkspace || 'personal';
+      
+      console.log(`📍 Current workspace: ${currentWorkspace}`);
+      
+      // Load materials list
+      if (userData.materialsList) {
+        materialsList = userData.materialsList;
+      } else {
+        materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
+      }
+      
+      // Load low filament threshold
+      if (userData.lowFilamentThreshold !== undefined) {
+        lowFilamentThreshold = userData.lowFilamentThreshold;
+        console.log(`✅ Low filament threshold: ${lowFilamentThreshold}g`);
+      } else {
+        lowFilamentThreshold = 200;
+      }
+    }
+    
+    // Determine which collection to load from based on workspace
+    let spoolsRef, emptySpoolsRef;
+    
+    if (currentWorkspace === 'personal') {
+      // Load from user's personal collections
+      spoolsRef = db.collection('users').doc(userId).collection('spools');
+      emptySpoolsRef = db.collection('users').doc(userId).collection('emptySpools');
+      
+      console.log('📦 Loading PERSONAL inventory...');
+    } else {
+      // Load from organization collections
+      const orgId = currentWorkspace;
+      
+      // Load organization data
+      const orgDoc = await db.collection('organizations').doc(orgId).get();
+      if (orgDoc.exists) {
+        activeOrganization = { id: orgId, ...orgDoc.data() };
+        console.log(`🏢 Loading BUSINESS inventory: ${activeOrganization.name}`);
+        
+        // Use organization's materials and threshold if available
+        if (activeOrganization.materialsList) {
+          materialsList = activeOrganization.materialsList;
+        }
+        if (activeOrganization.lowFilamentThreshold) {
+          lowFilamentThreshold = activeOrganization.lowFilamentThreshold;
+        }
+      }
+      
+      spoolsRef = db.collection('organizations').doc(orgId).collection('spools');
+      emptySpoolsRef = db.collection('organizations').doc(orgId).collection('emptySpools');
+    }
+    
     // Load spools
-    const spoolsSnapshot = await db.collection('users').doc(userId).collection('spools').get();
+    const spoolsSnapshot = await spoolsRef.get();
     spoolLibrary = spoolsSnapshot.docs.map(doc => ({ 
       firestoreId: doc.id, 
       ...doc.data() 
@@ -35,27 +94,12 @@ async function loadInventoryData() {
     console.log(`✅ Loaded ${spoolLibrary.length} spools for inventory`);
     
     // Load empty spools
-    const emptySpoolsSnapshot = await db.collection('users').doc(userId).collection('emptySpools').get();
+    const emptySpoolsSnapshot = await emptySpoolsRef.get();
     emptySpoolsLibrary = emptySpoolsSnapshot.docs.map(doc => ({ 
       firestoreId: doc.id, 
       ...doc.data() 
     }));
-    
-    // Load materials
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (userDoc.exists && userDoc.data().materialsList) {
-      materialsList = userDoc.data().materialsList;
-    } else {
-      materialsList = ["PLA", "ABS", "PETG", "Nylon", "TPU", "Custom"];
-    }
-    
-    // Load low filament threshold
-    if (userDoc.exists && userDoc.data().lowFilamentThreshold !== undefined) {
-      lowFilamentThreshold = userDoc.data().lowFilamentThreshold;
-      console.log(`✅ Low filament threshold: ${lowFilamentThreshold}g`);
-    } else {
-      lowFilamentThreshold = 200;
-    }
+    console.log(`✅ Loaded ${emptySpoolsLibrary.length} empty spools`);
 
   } catch (error) {
     console.error('Error loading inventory:', error);
@@ -72,11 +116,21 @@ async function saveSpoolToFirebase(index) {
     const firestoreId = spool.firestoreId;
     
     if (firestoreId) {
+      // Load current workspace
+      const userDoc = await db.collection('users').doc(currentUser.uid).get();
+      const currentWorkspace = userDoc.exists ? (userDoc.data().currentWorkspace || 'personal') : 'personal';
+      
       // Update existing spool in Firebase
       const { firestoreId: _, createdAt, ...spoolData } = spool; // Remove Firestore metadata
-      await db.collection('users').doc(currentUser.uid)
-        .collection('spools').doc(firestoreId)
-        .update(spoolData);
+      
+      let spoolRef;
+      if (currentWorkspace === 'personal') {
+        spoolRef = db.collection('users').doc(currentUser.uid).collection('spools').doc(firestoreId);
+      } else {
+        spoolRef = db.collection('organizations').doc(currentWorkspace).collection('spools').doc(firestoreId);
+      }
+      
+      await spoolRef.update(spoolData);
       console.log('✅ Spool updated in Firebase');
       alert('Changes saved to cloud!');
     }
@@ -379,6 +433,10 @@ async function confirmRetirement() {
   try {
     const spool = spoolLibrary[spoolToRetire];
     
+    // Load current workspace
+    const userDoc = await db.collection('users').doc(currentUser.uid).get();
+    const currentWorkspace = userDoc.exists ? (userDoc.data().currentWorkspace || 'personal') : 'personal';
+    
     // Update spool status
     spool.status = "retired";
     spool.retiredAt = firebase.firestore.FieldValue.serverTimestamp();
@@ -386,13 +444,18 @@ async function confirmRetirement() {
     
     // Update in Firebase
     if (spool.firestoreId) {
-      await db.collection('users').doc(currentUser.uid)
-        .collection('spools').doc(spool.firestoreId)
-        .update({
-          status: "retired",
-          retiredAt: firebase.firestore.FieldValue.serverTimestamp(),
-          retirementReason: reason
-        });
+      let spoolRef;
+      if (currentWorkspace === 'personal') {
+        spoolRef = db.collection('users').doc(currentUser.uid).collection('spools').doc(spool.firestoreId);
+      } else {
+        spoolRef = db.collection('organizations').doc(currentWorkspace).collection('spools').doc(spool.firestoreId);
+      }
+      
+      await spoolRef.update({
+        status: "retired",
+        retiredAt: firebase.firestore.FieldValue.serverTimestamp(),
+        retirementReason: reason
+      });
       
       console.log('✅ Spool retired in Firebase');
       alert(`Spool retired successfully!\n\nReason: ${reason}`);
@@ -424,6 +487,10 @@ async function unretireSpool(index) {
   try {
     const spool = spoolLibrary[index];
     
+    // Load current workspace
+    const userDoc = await db.collection('users').doc(currentUser.uid).get();
+    const currentWorkspace = userDoc.exists ? (userDoc.data().currentWorkspace || 'personal') : 'personal';
+    
     // Update spool status
     spool.status = "active";
     delete spool.retiredAt;
@@ -431,13 +498,18 @@ async function unretireSpool(index) {
     
     // Update in Firebase
     if (spool.firestoreId) {
-      await db.collection('users').doc(currentUser.uid)
-        .collection('spools').doc(spool.firestoreId)
-        .update({
-          status: "active",
-          retiredAt: firebase.firestore.FieldValue.delete(),
-          retirementReason: firebase.firestore.FieldValue.delete()
-        });
+      let spoolRef;
+      if (currentWorkspace === 'personal') {
+        spoolRef = db.collection('users').doc(currentUser.uid).collection('spools').doc(spool.firestoreId);
+      } else {
+        spoolRef = db.collection('organizations').doc(currentWorkspace).collection('spools').doc(spool.firestoreId);
+      }
+      
+      await spoolRef.update({
+        status: "active",
+        retiredAt: firebase.firestore.FieldValue.delete(),
+        retirementReason: firebase.firestore.FieldValue.delete()
+      });
       
       console.log('✅ Spool unretired in Firebase');
       alert('Spool restored to active inventory!');

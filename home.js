@@ -170,6 +170,16 @@ async function loadUserData() {
     updateLowFilamentBadge();
     await initializeWorkspace();  // NEW - Initialize workspace switcher
 
+    //Debug check: If currentWorkspace is an org but not in userOrganizations, reset to personal
+    if (currentWorkspace !== 'personal' && !userOrganizations.includes(currentWorkspace)) {
+      console.warn('⚠️ Current workspace not in user orgs, resetting to personal');
+      await db.collection('users').doc(currentUser.uid).update({
+        currentWorkspace: 'personal'
+      });
+      currentWorkspace = 'personal';
+      await loadUserData(); // Reload with corrected workspace
+    }
+
   } catch (error) {
     console.error('❌ Error loading user data:', error);
     alert('Failed to load your data from the cloud. Please try refreshing the page.');
@@ -426,27 +436,56 @@ function showScreen(id) {
     renderMaterialsList(); // Render materials list when opening materials screen
   }
   if (id === "settings") {
-  // Update spool count
-  const spoolCount = document.getElementById("spoolCount");
-  if (spoolCount) {
-    const count = spoolLibrary.length;
-    const limit = isProUser() ? "∞" : "25";
-    spoolCount.innerHTML = `<strong>Spools:</strong> ${count} / ${limit}`;
-    
-    // Warning if near limit
-    if (count >= 20 && !isProUser()) {
-      spoolCount.style.color = "#ff6b6b";
-      spoolCount.innerHTML += ` <small>(${25 - count} remaining)</small>`;
+    // Update spool count
+    const spoolCount = document.getElementById("spoolCount");
+    if (spoolCount) {
+      const count = spoolLibrary.length;
+      const limit = isProUser() ? "∞" : "25";
+      spoolCount.innerHTML = `<strong>Spools:</strong> ${count} / ${limit}`;
+      
+      // Warning if near limit
+      if (count >= 20 && !isProUser()) {
+        spoolCount.style.color = "#ff6b6b";
+        spoolCount.innerHTML += ` <small>(${25 - count} remaining)</small>`;
+      }
     }
-// NEW CODE - Populate low filament threshold
-  const thresholdInput = document.getElementById("lowFilamentThreshold");
-  if (thresholdInput) {
-    thresholdInput.value = lowFilamentThreshold;
+    
+    // Populate low filament threshold
+    const thresholdInput = document.getElementById("lowFilamentThreshold");
+    if (thresholdInput) {
+      thresholdInput.value = lowFilamentThreshold;
+    }
+    
+    // NEW CODE - Show/hide and populate business management section
+    const businessSection = document.getElementById("businessManagementSection");
+    if (businessSection) {
+      if (currentWorkspace !== 'personal' && activeOrganization) {
+        // Show business section
+        businessSection.classList.remove("hidden");
+        
+        // Populate business info
+        document.getElementById("bizName").textContent = activeOrganization.name;
+        
+        const currentMember = activeOrganization.members.find(m => m.userId === currentUser.uid);
+        document.getElementById("bizRole").textContent = currentMember ? currentMember.role : 'member';
+        document.getElementById("bizLocation").textContent = currentMember ? currentMember.location : '—';
+        document.getElementById("bizPlan").textContent = activeOrganization.plan === 'free' ? 'Free' : 'Pro';
+        document.getElementById("bizMemberCount").textContent = `${activeOrganization.members.length} ${activeOrganization.members.length === 3 ? '(Free tier limit)' : ''}`;
+        
+        // Show invite code if admin
+        const inviteSection = document.getElementById("inviteCodeSection");
+        if (currentMember && currentMember.role === 'admin') {
+          inviteSection.classList.remove("hidden");
+          document.getElementById("inviteCodeDisplay").value = activeOrganization.inviteCode;
+        } else {
+          inviteSection.classList.add("hidden");
+        }
+      } else {
+        // Hide business section when in personal workspace
+        businessSection.classList.add("hidden");
+      }
+    }
   }
-
-
-  }
-}
 }
 
 // ----- Material Management Functions -----
@@ -884,14 +923,27 @@ if (!material || material === "add_new") {
     sheen,
     glowInDark,
     texture,
-    status: "active",  // NEW LINE - Set default status
+    status: "active",
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   };
 
+  // Add owner tracking if in business workspace
+  if (currentWorkspace !== 'personal') {
+    newSpool.ownerId = currentUser.uid;
+    newSpool.location = activeOrganization.members.find(m => m.userId === currentUser.uid)?.location || 'Unknown';
+  }
+
   try {
-    // Save to Firebase
-    const docRef = await db.collection('users').doc(currentUser.uid).collection('spools').add(newSpool);
+    let docRef;
     
+    // Determine where to save based on workspace
+    if (currentWorkspace === 'personal') {
+      docRef = await db.collection('users').doc(currentUser.uid).collection('spools').add(newSpool);
+    } else {
+      // Save to organization
+      docRef = await db.collection('organizations').doc(currentWorkspace).collection('spools').add(newSpool);
+    }
+
     // Add to local array with Firestore ID
     spoolLibrary.push({
       firestoreId: docRef.id,
@@ -1306,11 +1358,16 @@ async function endPrintJob() {
       if (spoolIndex !== -1 && spoolLibrary[spoolIndex]) {
         spoolLibrary[spoolIndex].weight = endWeight;
         
-        // Update in Firebase
+        // Update in Firebase - workspace aware
         if (spoolLibrary[spoolIndex].firestoreId) {
-          db.collection('users').doc(currentUser.uid)
-            .collection('spools').doc(spoolLibrary[spoolIndex].firestoreId)
-            .update({ weight: endWeight })
+          let spoolRef;
+          if (currentWorkspace === 'personal') {
+            spoolRef = db.collection('users').doc(currentUser.uid).collection('spools').doc(spoolLibrary[spoolIndex].firestoreId);
+          } else {
+            spoolRef = db.collection('organizations').doc(currentWorkspace).collection('spools').doc(spoolLibrary[spoolIndex].firestoreId);
+          }
+          
+          spoolRef.update({ weight: endWeight })
             .catch(err => console.error('Error updating spool weight:', err));
         }
       }
@@ -1332,9 +1389,22 @@ async function endPrintJob() {
       endTime: new Date().toISOString(),
       status: "success"
     };
+    
+    // Add user tracking if in business workspace
+    if (currentWorkspace !== 'personal') {
+      historyEntry.userId = currentUser.uid;
+      historyEntry.location = activeOrganization.members.find(m => m.userId === currentUser.uid)?.location || 'Unknown';
+    }
 
-    // Save to Firebase
-    const docRef = await db.collection('users').doc(currentUser.uid).collection('history').add(historyEntry);
+    let docRef;
+    
+    // Determine where to save based on workspace
+    if (currentWorkspace === 'personal') {
+      docRef = await db.collection('users').doc(currentUser.uid).collection('history').add(historyEntry);
+    } else {
+      // Save to organization
+      docRef = await db.collection('organizations').doc(currentWorkspace).collection('history').add(historyEntry);
+    }
     
     // Add to local array
     usageHistory.push({
@@ -1385,11 +1455,16 @@ async function failedPrintJob() {
       if (spoolIndex !== -1 && spoolLibrary[spoolIndex]) {
         spoolLibrary[spoolIndex].weight = endWeight;
         
-        // Update in Firebase
+        // Update in Firebase - workspace aware
         if (spoolLibrary[spoolIndex].firestoreId) {
-          db.collection('users').doc(currentUser.uid)
-            .collection('spools').doc(spoolLibrary[spoolIndex].firestoreId)
-            .update({ weight: endWeight })
+          let spoolRef;
+          if (currentWorkspace === 'personal') {
+            spoolRef = db.collection('users').doc(currentUser.uid).collection('spools').doc(spoolLibrary[spoolIndex].firestoreId);
+          } else {
+            spoolRef = db.collection('organizations').doc(currentWorkspace).collection('spools').doc(spoolLibrary[spoolIndex].firestoreId);
+          }
+          
+          spoolRef.update({ weight: endWeight })
             .catch(err => console.error('Error updating spool weight:', err));
         }
       }
@@ -1411,9 +1486,22 @@ async function failedPrintJob() {
       endTime: new Date().toISOString(),
       status: "failed"
     };
+    
+    // Add user tracking if in business workspace
+    if (currentWorkspace !== 'personal') {
+      historyEntry.userId = currentUser.uid;
+      historyEntry.location = activeOrganization.members.find(m => m.userId === currentUser.uid)?.location || 'Unknown';
+    }
 
-    // Save to Firebase
-    const docRef = await db.collection('users').doc(currentUser.uid).collection('history').add(historyEntry);
+    let docRef;
+    
+    // Determine where to save based on workspace
+    if (currentWorkspace === 'personal') {
+      docRef = await db.collection('users').doc(currentUser.uid).collection('history').add(historyEntry);
+    } else {
+      // Save to organization
+      docRef = await db.collection('organizations').doc(currentWorkspace).collection('history').add(historyEntry);
+    }
     
     // Add to local array
     usageHistory.push({
@@ -1589,20 +1677,45 @@ async function saveEmptySpoolFromModal() {
     return;
   }
 
-  const docRef = await db
-    .collection('users')
-    .doc(currentUser.uid)
-    .collection('emptySpools')
-    .add({ brand, package: packageType, weight });
+  const emptySpoolData = { 
+    brand, 
+    package: packageType, 
+    weight 
+  };
+  
+  // Add owner tracking if in business workspace
+  if (currentWorkspace !== 'personal') {
+    emptySpoolData.ownerId = currentUser.uid;
+  }
 
-  emptySpoolsLibrary.push({
-    firestoreId: docRef.id,
-    brand,
-    package: packageType,
-    weight
-  });
+  try {
+    let docRef;
+    
+    // Determine where to save based on workspace
+    if (currentWorkspace === 'personal') {
+      docRef = await db.collection('users').doc(currentUser.uid).collection('emptySpools').add(emptySpoolData);
+    } else {
+      // Save to organization
+      docRef = await db.collection('organizations').doc(currentWorkspace).collection('emptySpools').add(emptySpoolData);
+    }
 
-  renderModalEmptySpoolList();
+    emptySpoolsLibrary.push({
+      firestoreId: docRef.id,
+      ...emptySpoolData
+    });
+
+    // Clear inputs
+    document.getElementById("modalEmptyBrand").value = "";
+    document.getElementById("modalEmptyPackage").value = "";
+    document.getElementById("modalEmptyWeight").value = "";
+
+    renderModalEmptySpoolList();
+    alert('Empty spool saved!');
+    
+  } catch (error) {
+    console.error('Error saving empty spool:', error);
+    alert('Failed to save empty spool. Please try again.');
+  }
 }
 
 
@@ -1730,7 +1843,12 @@ async function switchWorkspace() {
   const select = document.getElementById("workspaceSelect");
   const newWorkspace = select.value;
   
-  if (newWorkspace === currentWorkspace) return;
+  if (newWorkspace === currentWorkspace) {
+    console.log('Already in this workspace');
+    return;
+  }
+  
+  console.log(`Attempting to switch from ${currentWorkspace} to ${newWorkspace}`);
   
   try {
     // Update in Firebase
@@ -1738,11 +1856,21 @@ async function switchWorkspace() {
       currentWorkspace: newWorkspace
     });
     
+    console.log('✅ Workspace updated in Firebase');
+    
     currentWorkspace = newWorkspace;
     console.log(`Switched to workspace: ${newWorkspace}`);
     
+    // Clear current data
+    spoolLibrary = [];
+    usageHistory = [];
+    emptySpoolsLibrary = [];
+    activeOrganization = null;
+    
     // Reload all data for new workspace
     await loadUserData();
+    
+    console.log('✅ Data reloaded for new workspace');
     
     // Refresh current screen
     const currentScreen = document.querySelector('main:not(.hidden), section:not(.hidden)');
@@ -1750,11 +1878,11 @@ async function switchWorkspace() {
       showScreen(currentScreen.id);
     }
     
-    alert(`Switched to ${newWorkspace === 'personal' ? 'Personal' : activeOrganization.name} workspace!`);
+    alert(`Switched to ${newWorkspace === 'personal' ? 'Personal' : activeOrganization?.name || 'Business'} workspace!`);
     
   } catch (error) {
-    console.error('Error switching workspace:', error);
-    alert('Failed to switch workspace. Please try again.');
+    console.error('❌ Error switching workspace:', error);
+    alert('Failed to switch workspace. Error: ' + error.message);
     select.value = currentWorkspace; // Revert selection
   }
 }
@@ -1894,12 +2022,44 @@ async function joinOrganization() {
     return;
   }
   
-  if (userOrganizations.length > 0) {
-    alert("You already belong to a business account.");
-    return;
-  }
-  
   try {
+    // FIRST: Ensure user document exists
+    const userDocRef = db.collection('users').doc(currentUser.uid);
+    const userDoc = await userDocRef.get();
+    
+    if (!userDoc.exists) {
+      // Create user document if it doesn't exist
+      console.log('Creating user document...');
+      await userDocRef.set({
+        email: currentUser.email,
+        displayName: currentUser.displayName,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        accountType: 'free',
+        subscription: {
+          status: 'free',
+          plan: 'free',
+          startDate: firebase.firestore.FieldValue.serverTimestamp(),
+          endDate: null,
+          provider: null,
+          transactionId: null
+        },
+        organizations: [],
+        lowFilamentThreshold: 200,
+        currentWorkspace: 'personal',
+        location: null
+      });
+    }
+    
+    // Check if already in an organization
+    const userData = (await userDocRef.get()).data();
+    const existingOrgs = userData.organizations || [];
+    
+    if (existingOrgs.length > 0) {
+      alert("You already belong to a business account.");
+      closeJoinOrgModal();
+      return;
+    }
+    
     // Find organization by invite code
     const orgsSnapshot = await db.collection('organizations')
       .where('inviteCode', '==', inviteCode)
@@ -1915,33 +2075,51 @@ async function joinOrganization() {
     const orgId = orgDoc.id;
     const orgData = orgDoc.data();
     
+    // Check if user is already a member
+    const isAlreadyMember = orgData.members.some(m => m.userId === currentUser.uid);
+    if (isAlreadyMember) {
+      alert(`You're already a member of ${orgData.name}. Please switch to the business workspace from the dropdown.`);
+      
+      // Make sure user document has this org
+      await userDocRef.update({
+        organizations: firebase.firestore.FieldValue.arrayUnion(orgId),
+        location: location,
+        currentWorkspace: orgId
+      });
+      
+      closeJoinOrgModal();
+      
+      userOrganizations = [orgId];
+      currentWorkspace = orgId;
+      await loadUserData();
+      return;
+    }
+    
     // Check member limit for free tier
     if (orgData.plan === 'free' && orgData.members.length >= 3) {
       alert("This business has reached the free tier limit of 3 members. The admin needs to upgrade to Pro to add more members.");
       return;
     }
     
-    // Check if user is already a member
-    if (orgData.members.some(m => m.userId === currentUser.uid)) {
-      alert("You are already a member of this business.");
-      return;
-    }
+    // Create new member object
+    const newMember = {
+      userId: currentUser.uid,
+      role: 'member',
+      location: location,
+      joinedAt: new Date()
+    };
     
     // Add user to organization
+    const updatedMembers = [...orgData.members, newMember];
     await db.collection('organizations').doc(orgId).update({
-      members: firebase.firestore.FieldValue.arrayUnion({
-        userId: currentUser.uid,
-        role: 'member',
-        location: location,
-        joinedAt: new Date()
-      })
+      members: updatedMembers
     });
     
     // Update user document
-    await db.collection('users').doc(currentUser.uid).update({
-      organizations: firebase.firestore.FieldValue.arrayUnion(orgId),
+    await userDocRef.update({
+      organizations: [orgId],
       location: location,
-      currentWorkspace: orgId // Auto-switch to new business
+      currentWorkspace: orgId
     });
     
     console.log('✅ Joined organization:', orgId);
@@ -1951,13 +2129,13 @@ async function joinOrganization() {
     alert(`Successfully joined ${orgData.name}!`);
     
     // Reload data to show new workspace
-    userOrganizations.push(orgId);
+    userOrganizations = [orgId];
     currentWorkspace = orgId;
     await loadUserData();
     
   } catch (error) {
     console.error('Error joining organization:', error);
-    alert('Failed to join business. Please try again.');
+    alert('Failed to join business. Error: ' + error.message);
   }
 }
 
@@ -1975,3 +2153,78 @@ window.addEventListener("click", (e) => {
     closeJoinOrgModal();
   }
 });
+
+// ===== BUSINESS MANAGEMENT IN SETTINGS =====
+
+// Copy invite code to clipboard
+function copyInviteCode() {
+  const input = document.getElementById("inviteCodeDisplay");
+  input.select();
+  input.setSelectionRange(0, 99999); // For mobile devices
+  
+  try {
+    document.execCommand('copy');
+    alert('Invite code copied to clipboard!');
+  } catch (err) {
+    alert('Failed to copy. Please manually copy the code: ' + input.value);
+  }
+}
+
+// Leave business confirmation
+async function leaveBusinessConfirm() {
+  if (!activeOrganization) return;
+  
+  const currentMember = activeOrganization.members.find(m => m.userId === currentUser.uid);
+  
+  // Check if user is the only admin
+  const adminCount = activeOrganization.members.filter(m => m.role === 'admin').length;
+  if (currentMember && currentMember.role === 'admin' && adminCount === 1) {
+    alert('You are the only admin. Please promote another member to admin before leaving, or delete the business instead.');
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to leave ${activeOrganization.name}?\n\nYou will lose access to all business spools and history.`)) {
+    return;
+  }
+  
+  try {
+    const orgId = activeOrganization.id;
+    
+    // Remove user from organization members array
+    const updatedMembers = activeOrganization.members.filter(m => m.userId !== currentUser.uid);
+    await db.collection('organizations').doc(orgId).update({
+      members: updatedMembers
+    });
+    
+    // Remove organization from user's organizations array
+    await db.collection('users').doc(currentUser.uid).update({
+      organizations: firebase.firestore.FieldValue.arrayRemove(orgId),
+      currentWorkspace: 'personal', // Switch back to personal
+      location: firebase.firestore.FieldValue.delete() // Remove location
+    });
+    
+    console.log('✅ Left organization');
+    
+    alert('You have left the business. Returning to personal workspace...');
+    
+    // Reset local state
+    userOrganizations = [];
+    currentWorkspace = 'personal';
+    activeOrganization = null;
+    
+    // Reload data
+    await loadUserData();
+    showScreen('home');
+    
+  } catch (error) {
+    console.error('Error leaving organization:', error);
+    alert('Failed to leave business. Please try again.');
+  }
+}
+
+// Show business management modal (placeholder for now)
+function showBusinessManagementModal() {
+  alert('Business member management coming in the next step!\n\nFor now, use Settings to view your invite code and business info.');
+}
+
+// ===== END BUSINESS MANAGEMENT =====
