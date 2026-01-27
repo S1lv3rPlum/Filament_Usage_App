@@ -550,6 +550,56 @@
   </div>
 </div>
 
+<!-- Business Management Modal -->
+<div id="businessManagementModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 700px;">
+    <h2>Business Management</h2>
+    <div id="businessManagementContent">
+      
+      <!-- Business Overview -->
+      <div style="background: #f0f4f8; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+        <h3 style="margin-top: 0;">Business Overview</h3>
+        <p style="margin: 5px 0;"><strong>Name:</strong> <span id="mgmtBizName">—</span></p>
+        <p style="margin: 5px 0;"><strong>Plan:</strong> <span id="mgmtBizPlan">—</span></p>
+        <p style="margin: 5px 0;"><strong>Total Members:</strong> <span id="mgmtMemberCount">—</span></p>
+        <p style="margin: 5px 0;"><strong>Total Spools:</strong> <span id="mgmtSpoolCount">—</span></p>
+        <p style="margin: 5px 0;"><strong>Invite Code:</strong> 
+          <input type="text" id="mgmtInviteCode" readonly style="width: 150px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; background: white; font-weight: bold;" />
+          <button onclick="copyInviteCodeFromManagement()" style="padding: 5px 10px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 5px;">Copy</button>
+        </p>
+      </div>
+      
+      <!-- Member List -->
+      <h3>Team Members</h3>
+      <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+        <table id="membersTable" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Location</th>
+              <th>Role</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      
+      <!-- Free Tier Warning -->
+      <div id="freeTierWarning" class="hidden" style="background: #fff3cd; border: 2px solid #ffc107; padding: 15px; border-radius: 6px; margin-top: 20px;">
+        <strong>⚠️ Free Tier Limit Reached</strong>
+        <p style="margin: 10px 0 0 0; font-size: 0.9em;">You have 3 members (maximum for free tier). Upgrade to Pro to add more team members.</p>
+      </div>
+      
+    </div>
+    
+    <div style="margin-top: 20px;">
+      <button onclick="closeBusinessManagementModal()" style="width: 100%; padding: 12px; background: #666; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer;">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>

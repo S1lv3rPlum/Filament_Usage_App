@@ -85,6 +85,37 @@ async function loadUserData() {
       console.log(`📍 Current workspace: ${currentWorkspace}`);
       console.log(`🏢 Organizations: ${userOrganizations.length}`);
       
+     // Check if user is still a member of their organizations
+      if (userOrganizations.length > 0) {
+        for (const orgId of userOrganizations) {
+          try {
+            const orgDoc = await db.collection('organizations').doc(orgId).get();
+            if (orgDoc.exists) {
+              const orgData = orgDoc.data();
+              const isMember = orgData.members.some(m => m.userId === userId);
+              
+              if (!isMember) {
+                // User was removed from organization, clean up their document
+                console.log(`⚠️ User removed from organization ${orgId}, cleaning up...`);
+                await db.collection('users').doc(userId).update({
+                  organizations: firebase.firestore.FieldValue.arrayRemove(orgId),
+                  currentWorkspace: 'personal',
+                  location: firebase.firestore.FieldValue.delete()
+                });
+                
+                // Update local state
+                userOrganizations = [];
+                currentWorkspace = 'personal';
+                
+                alert('You have been removed from the business. Returning to personal workspace.');
+              }
+            }
+          } catch (error) {
+            console.error('Error checking organization membership:', error);
+          }
+        }
+      }
+     
       // Load materials list
       if (userData.materialsList) {
         materialsList = userData.materialsList;
@@ -2183,12 +2214,17 @@ async function leaveBusinessConfirm() {
     return;
   }
   
-  if (!confirm(`Are you sure you want to leave ${activeOrganization.name}?\n\nYou will lose access to all business spools and history.`)) {
+  if (!confirm(`Are you sure you want to leave ${activeOrganization.name}?\n\nYour spools and print history will be transferred to your personal account.`)) {
     return;
   }
   
   try {
     const orgId = activeOrganization.id;
+    
+    alert('Transferring your data to personal account... This may take a moment.');
+    
+    // Transfer user's data to their personal account
+    const transferred = await transferUserDataToPersonal(currentUser.uid, orgId);
     
     // Remove user from organization members array
     const updatedMembers = activeOrganization.members.filter(m => m.userId !== currentUser.uid);
@@ -2199,13 +2235,13 @@ async function leaveBusinessConfirm() {
     // Remove organization from user's organizations array
     await db.collection('users').doc(currentUser.uid).update({
       organizations: firebase.firestore.FieldValue.arrayRemove(orgId),
-      currentWorkspace: 'personal', // Switch back to personal
-      location: firebase.firestore.FieldValue.delete() // Remove location
+      currentWorkspace: 'personal',
+      location: firebase.firestore.FieldValue.delete()
     });
     
     console.log('✅ Left organization');
     
-    alert('You have left the business. Returning to personal workspace...');
+    alert(`You have left ${activeOrganization.name}.\n\nTransferred to your personal account:\n• ${transferred.spools} spools\n• ${transferred.history} print jobs\n• ${transferred.emptySpools} empty spools`);
     
     // Reset local state
     userOrganizations = [];
@@ -2222,9 +2258,257 @@ async function leaveBusinessConfirm() {
   }
 }
 
-// Show business management modal (placeholder for now)
-function showBusinessManagementModal() {
-  alert('Business member management coming in the next step!\n\nFor now, use Settings to view your invite code and business info.');
+// ===== BUSINESS MANAGEMENT MODAL =====
+
+// Show business management modal
+async function showBusinessManagementModal() {
+  if (!activeOrganization) {
+    alert('No active business workspace.');
+    return;
+  }
+  
+  const modal = document.getElementById("businessManagementModal");
+  modal.style.display = "block";
+  
+  // Populate business overview
+  document.getElementById("mgmtBizName").textContent = activeOrganization.name;
+  document.getElementById("mgmtBizPlan").textContent = activeOrganization.plan === 'free' ? 'Free (3 members max, 25 spools total)' : 'Pro (Unlimited)';
+  document.getElementById("mgmtMemberCount").textContent = `${activeOrganization.members.length} / ${activeOrganization.plan === 'free' ? '3' : '∞'}`;
+  document.getElementById("mgmtSpoolCount").textContent = `${spoolLibrary.length} / ${activeOrganization.plan === 'free' ? '25' : '∞'}`;
+  document.getElementById("mgmtInviteCode").value = activeOrganization.inviteCode;
+  
+  // Show warning if at free tier limit
+  const warning = document.getElementById("freeTierWarning");
+  if (activeOrganization.plan === 'free' && activeOrganization.members.length >= 3) {
+    warning.classList.remove("hidden");
+  } else {
+    warning.classList.add("hidden");
+  }
+  
+  // Load and render member list
+  await renderMembersList();
 }
 
-// ===== END BUSINESS MANAGEMENT =====
+// Close business management modal
+function closeBusinessManagementModal() {
+  document.getElementById("businessManagementModal").style.display = "none";
+}
+
+// Render members list
+async function renderMembersList() {
+  const tbody = document.querySelector("#membersTable tbody");
+  tbody.innerHTML = "";
+  
+  if (!activeOrganization || !activeOrganization.members) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #666;">No members found</td></tr>';
+    return;
+  }
+  
+  const currentMember = activeOrganization.members.find(m => m.userId === currentUser.uid);
+  const isAdmin = currentMember && currentMember.role === 'admin';
+  
+  // Load user emails for all members
+  for (const member of activeOrganization.members) {
+    try {
+      const userDoc = await db.collection('users').doc(member.userId).get();
+      const userData = userDoc.exists ? userDoc.data() : null;
+      
+      const tr = document.createElement("tr");
+      
+      const email = userData ? userData.email : 'Unknown';
+      const joinedDate = member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : '—';
+      const isCurrentUser = member.userId === currentUser.uid;
+      
+      tr.innerHTML = `
+        <td>${email}${isCurrentUser ? ' <strong>(You)</strong>' : ''}</td>
+        <td>${member.location}</td>
+        <td><span style="padding: 3px 8px; background: ${member.role === 'admin' ? '#007acc' : '#28a745'}; color: white; border-radius: 4px; font-size: 0.85em;">${member.role.toUpperCase()}</span></td>
+        <td style="font-size: 0.9em;">${joinedDate}</td>
+        <td>
+          ${isAdmin && !isCurrentUser ? `
+            <button onclick="removeMemberConfirm('${member.userId}', '${email}')" style="padding: 6px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Remove</button>
+          ` : '—'}
+        </td>
+      `;
+      
+      tbody.appendChild(tr);
+      
+    } catch (error) {
+      console.error('Error loading member data:', error);
+    }
+  }
+}
+
+// Copy invite code from management modal
+function copyInviteCodeFromManagement() {
+  const input = document.getElementById("mgmtInviteCode");
+  input.select();
+  input.setSelectionRange(0, 99999);
+  
+  try {
+    document.execCommand('copy');
+    alert('Invite code copied to clipboard!');
+  } catch (err) {
+    alert('Failed to copy. Please manually copy the code: ' + input.value);
+  }
+}
+
+// Remove member confirmation
+async function removeMemberConfirm(userId, email) {
+  if (!confirm(`Remove ${email} from this business?\n\nTheir spools and print history will be transferred to their personal account.`)) {
+    return;
+  }
+  
+  try {
+    const orgId = activeOrganization.id;
+    
+    // Show loading message
+    alert('Transferring user data to personal account... This may take a moment.');
+    
+    // Transfer user's data to their personal account
+    const transferred = await transferUserDataToPersonal(userId, orgId);
+    
+    // Remove member from organization
+    const updatedMembers = activeOrganization.members.filter(m => m.userId !== userId);
+    await db.collection('organizations').doc(orgId).update({
+      members: updatedMembers
+    });
+    
+    console.log('✅ Member removed from organization');
+    
+    alert(`${email} has been removed from the business.\n\nTransferred to their personal account:\n• ${transferred.spools} spools\n• ${transferred.history} print jobs\n• ${transferred.emptySpools} empty spools`);
+    
+    // Update local organization data
+    activeOrganization.members = updatedMembers;
+    
+    // Refresh the member list
+    await renderMembersList();
+    
+    // Update overview counts
+    document.getElementById("mgmtMemberCount").textContent = `${activeOrganization.members.length} / ${activeOrganization.plan === 'free' ? '3' : '∞'}`;
+    
+    // Update free tier warning
+    const warning = document.getElementById("freeTierWarning");
+    if (activeOrganization.plan === 'free' && activeOrganization.members.length >= 3) {
+      warning.classList.remove("hidden");
+    } else {
+      warning.classList.add("hidden");
+    }
+    
+  } catch (error) {
+    console.error('Error removing member:', error);
+    alert('Failed to remove member. Please try again.');
+  }
+}
+
+// Close modal when clicking outside
+window.addEventListener("click", (e) => {
+  const createOrgModal = document.getElementById("createOrgModal");
+  const joinOrgModal = document.getElementById("joinOrgModal");
+  const businessMgmtModal = document.getElementById("businessManagementModal");
+  
+  if (e.target === createOrgModal) {
+    closeCreateOrgModal();
+  }
+  if (e.target === joinOrgModal) {
+    closeJoinOrgModal();
+  }
+  if (e.target === businessMgmtModal) {
+    closeBusinessManagementModal();
+  }
+});
+
+// ===== END BUSINESS MANAGEMENT MODAL =====
+
+// Transfer user's data from organization to personal account
+async function transferUserDataToPersonal(userId, orgId) {
+  try {
+    console.log(`🔄 Transferring data for user ${userId} from org ${orgId}...`);
+    
+    let transferredSpools = 0;
+    let transferredHistory = 0;
+    let transferredEmptySpools = 0;
+    
+    // Transfer spools owned by this user
+    const orgSpoolsSnapshot = await db.collection('organizations').doc(orgId).collection('spools')
+      .where('ownerId', '==', userId)
+      .get();
+    
+    for (const doc of orgSpoolsSnapshot.docs) {
+      const spoolData = doc.data();
+      
+      // Remove org-specific fields
+      const { ownerId, location, ...personalSpoolData } = spoolData;
+      
+      // Add to user's personal collection
+      await db.collection('users').doc(userId).collection('spools').add(personalSpoolData);
+      
+      // Mark as transferred in org (keep for records)
+      await db.collection('organizations').doc(orgId).collection('spools').doc(doc.id).update({
+        transferred: true,
+        transferredAt: new Date(),
+        transferredTo: 'personal'
+      });
+      
+      transferredSpools++;
+    }
+    
+    // Transfer history entries by this user
+    const orgHistorySnapshot = await db.collection('organizations').doc(orgId).collection('history')
+      .where('userId', '==', userId)
+      .get();
+    
+    for (const doc of orgHistorySnapshot.docs) {
+      const historyData = doc.data();
+      
+      // Remove org-specific fields
+      const { userId: _, location, ...personalHistoryData } = historyData;
+      
+      // Add to user's personal collection
+      await db.collection('users').doc(userId).collection('history').add(personalHistoryData);
+      
+      // Mark as transferred in org
+      await db.collection('organizations').doc(orgId).collection('history').doc(doc.id).update({
+        transferred: true,
+        transferredAt: new Date()
+      });
+      
+      transferredHistory++;
+    }
+    
+    // Transfer empty spools owned by this user
+    const orgEmptySpoolsSnapshot = await db.collection('organizations').doc(orgId).collection('emptySpools')
+      .where('ownerId', '==', userId)
+      .get();
+    
+    for (const doc of orgEmptySpoolsSnapshot.docs) {
+      const emptySpoolData = doc.data();
+      
+      // Remove org-specific fields
+      const { ownerId, ...personalEmptySpoolData } = emptySpoolData;
+      
+      // Add to user's personal collection
+      await db.collection('users').doc(userId).collection('emptySpools').add(personalEmptySpoolData);
+      
+      // Mark as transferred in org
+      await db.collection('organizations').doc(orgId).collection('emptySpools').doc(doc.id).update({
+        transferred: true,
+        transferredAt: new Date()
+      });
+      
+      transferredEmptySpools++;
+    }
+    
+    console.log(`✅ Transfer complete: ${transferredSpools} spools, ${transferredHistory} history entries, ${transferredEmptySpools} empty spools`);
+    
+    return {
+      spools: transferredSpools,
+      history: transferredHistory,
+      emptySpools: transferredEmptySpools
+    };
+    
+  } catch (error) {
+    console.error('Error transferring user data:', error);
+    throw error;
+  }
+}
