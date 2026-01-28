@@ -1042,7 +1042,20 @@ function renderLibrary() {
       colorDisplay += ` - [${spool.gradientBaseColors.join(", ")}]`;
     }
     
-    li.textContent = `${spool.brand} - ${colorDisplay} - ${spool.material} (${lengthDisplay}${weightDisplay})`;
+    // NEW CODE - Add owner/location info for business workspace
+    let ownerInfo = "";
+    if (currentWorkspace !== 'personal' && spool.ownerId) {
+      const isMyOwn = spool.ownerId === currentUser.uid;
+      const locationText = spool.location || 'Unknown Location';
+      
+      if (isMyOwn) {
+        ownerInfo = ` 📍 <span style="color: #007acc; font-weight: bold;">[Your spool - ${locationText}]</span>`;
+      } else {
+        ownerInfo = ` 📍 <span style="color: #666;">[${locationText}]</span>`;
+      }
+    }
+    
+    li.innerHTML = `${spool.brand} - ${colorDisplay} - ${spool.material} (${lengthDisplay}${weightDisplay})${ownerInfo}`;
     list.appendChild(li);
   });
 }

@@ -7,6 +7,7 @@ let showingRetired = false;
 let showingOnlyLow = false;  
 let lowFilamentThreshold = 200 // Default threshold
 let spoolToRetire = null;
+let currentWorkspace = 'personal';
 
 // Wait for auth before loading
 auth.onAuthStateChanged(async (user) => {
@@ -28,12 +29,11 @@ async function loadInventoryData() {
     
     // Load user document first to get workspace info
     const userDoc = await db.collection('users').doc(userId).get();
-    let currentWorkspace = 'personal';
-    let activeOrganization = null;
+    let activeOrganization = null;  // NEW LINE
     
     if (userDoc.exists) {
       const userData = userDoc.data();
-      currentWorkspace = userData.currentWorkspace || 'personal';
+      currentWorkspace = userData.currentWorkspace || 'personal';  // NEW LINE
       
       console.log(`📍 Current workspace: ${currentWorkspace}`);
       
@@ -299,13 +299,24 @@ function renderInventoryTable() {
     // Bold weight if low
     const weightStyle = spool.weight <= lowFilamentThreshold ? "font-weight: bold;" : "";
 
+    //Add owner badge for business workspace
+    let ownerBadge = "";
+    if (spool.ownerId && spool.location) {
+      const isMyOwn = spool.ownerId === currentUser.uid;
+      
+      if (isMyOwn) {
+        ownerBadge = ` <span style="display: inline-block; padding: 2px 6px; background: #007acc; color: white; border-radius: 3px; font-size: 0.75em; font-weight: bold;">YOUR SPOOL - ${spool.location}</span>`;
+      } else {
+        ownerBadge = ` <span style="display: inline-block; padding: 2px 6px; background: #6c757d; color: white; border-radius: 3px; font-size: 0.75em;">${spool.location}</span>`;
+      }
+    }
 
     tr.innerHTML = `
-   <td class="cell-brand"><span>${escapeHtml(spool.brand)}</span></td>
+   <td class="cell-brand"><span>${escapeHtml(spool.brand)}${ownerBadge}</span></td>
    <td class="cell-color"><span>${escapeHtml(spool.color)}</span></td>
    <td class="cell-material"><span>${escapeHtml(spool.material)}</span></td>
    <td class="cell-length"><span>${spool.length > 0 ? Number(spool.length).toFixed(2) : 'N/A'}</span></td>
-   <td class="cell-weight"><span>${Number(spool.weight).toFixed(2)}</span></td>
+   <td class="cell-weight"><span style="${weightStyle}">${Number(spool.weight).toFixed(2)}</span></td>
    <td class="cell-color-details"><span style="font-size: 0.85em;">${colorDetails}</span></td>
    <td class="cell-empty"><span>${emptySpoolDisplay}</span></td>
    <td class="cell-actions">
@@ -314,7 +325,8 @@ function renderInventoryTable() {
      <button class="cancel-btn hidden">Cancel</button>
      <button class="retire-btn" style="background: #ff6b6b; margin-top: 5px;">Retire</button>
    </td>
-`;
+
+  `;
 
     tbody.appendChild(tr);
   });
