@@ -1278,8 +1278,13 @@ function populateSpoolMultiSelect() {
   select.innerHTML = "";
   
   // Filter to only show active spools
-  const activeSpools = spoolLibrary.filter(spool => !spool.status || spool.status === "active");
+  let activeSpools = spoolLibrary.filter(spool => !spool.status || spool.status === "active");
   
+ // - In business workspace, only show user's own spools
+  if (currentWorkspace !== 'personal') {
+    activeSpools = activeSpools.filter(spool => spool.ownerId === currentUser.uid);
+  }
+
   if (activeSpools.length === 0) {
     const option = document.createElement("option");
     option.value = "";
@@ -1376,8 +1381,321 @@ function showEndPrintSection() {
   });
 }
 
+// Handle print jobs that need multiple spools
+async function handleMultiSpoolPrint(spoolsNeedingMore) {
+  const spool = spoolsNeedingMore[0]; // Handle first shortage (can extend for multiple later)
+  
+  const message = `⚠️ Spool Ran Out!\n\n${spool.spoolLabel}\nStarting weight: ${spool.startWeight.toFixed(2)}g\nNeeded: ${spool.gramsUsed.toFixed(2)}g\nShortage: ${spool.shortage.toFixed(2)}g\n\nDid this spool run out and you switched to another?`;
+  
+  if (!confirm(message)) {
+    alert("Please correct the final weight and try again.");
+    return;
+  }
+  
+  // Show multi-spool modal
+  showMultiSpoolModal(spool);
+}
+
+// Show modal for handling multi-spool prints
+function showMultiSpoolModal(spoolInfo) {
+  const modal = document.getElementById("multiSpoolModal");
+  const content = document.getElementById("multiSpoolContent");
+  
+  content.innerHTML = `
+    <h3>First Spool Ran Out</h3>
+    <p><strong>${spoolInfo.spoolLabel}</strong></p>
+    <p>Started with: ${spoolInfo.startWeight.toFixed(2)}g</p>
+    <p>Print needed: ${spoolInfo.gramsUsed.toFixed(2)}g</p>
+    <p style="color: #dc3545; font-weight: bold;">Shortage: ${spoolInfo.shortage.toFixed(2)}g</p>
+    
+    <hr style="margin: 20px 0;">
+    
+    <h4>Set First Spool to Empty (0g)?</h4>
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+      <button onclick="setFirstSpoolEmpty(true)" style="flex: 1; padding: 10px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer;">
+        Yes - Set to 0g
+      </button>
+      <button onclick="setFirstSpoolEmpty(false)" style="flex: 1; padding: 10px; background: #007acc; color: white; border: none; border-radius: 6px; cursor: pointer;">
+        No - Keep Remaining Weight
+      </button>
+    </div>
+    
+    <div id="secondSpoolSection" class="hidden">
+      <h4>Select Second Spool Used</h4>
+      <label>Which spool did you switch to?</label>
+      <select id="secondSpoolSelect" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;">
+        <option value="">-- Select Spool --</option>
+      </select>
+      
+      <label>Final weight of second spool (g):</label>
+      <input type="number" id="secondSpoolFinalWeight" step="0.01" placeholder="Enter final weight" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;" />
+      
+      <div style="background: #f0f4f8; padding: 15px; border-radius: 6px; margin: 15px 0;">
+        <p style="margin: 0;"><strong>Calculation:</strong></p>
+        <p style="margin: 5px 0;">First spool used: <span id="firstSpoolUsed">—</span></p>
+        <p style="margin: 5px 0;">Second spool will use: <span id="secondSpoolUsed">—</span></p>
+        <p style="margin: 5px 0; font-weight: bold;">Total: <span id="totalUsed">—</span></p>
+      </div>
+      
+      <button onclick="completeMultiSpoolPrint()" style="width: 100%; padding: 12px; background: #007acc; color: white; border: none; border-radius: 6px; font-size: 1em; cursor: pointer; margin-top: 10px;">
+        Complete Print Job
+      </button>
+    </div>
+  `;
+  
+  modal.style.display = "block";
+  
+  // Store the spool info for later use
+  modal.dataset.spoolInfo = JSON.stringify(spoolInfo);
+}
+
+// Set first spool to empty or keep remaining
+function setFirstSpoolEmpty(isEmpty) {
+  const modal = document.getElementById("multiSpoolModal");
+  const spoolInfo = JSON.parse(modal.dataset.spoolInfo);
+  
+  // Store the decision
+  modal.dataset.firstSpoolEmpty = isEmpty;
+  
+  const firstSpoolUsed = isEmpty ? spoolInfo.startWeight : spoolInfo.gramsUsed;
+  modal.dataset.firstSpoolUsed = firstSpoolUsed;
+  
+  // Show second spool section
+  document.getElementById("secondSpoolSection").classList.remove("hidden");
+  
+  // Populate second spool dropdown (exclude the first spool)
+  const secondSpoolSelect = document.getElementById("secondSpoolSelect");
+  secondSpoolSelect.innerHTML = '<option value="">-- Select Spool --</option>';
+  
+  const activeSpools = spoolLibrary.filter(spool => 
+    (!spool.status || spool.status === "active") && 
+    spoolLibrary.indexOf(spool) !== parseInt(spoolInfo.spoolId)
+  );
+  
+  activeSpools.forEach(spool => {
+    const index = spoolLibrary.indexOf(spool);
+    const option = document.createElement("option");
+    option.value = index;
+    option.dataset.startWeight = spool.weight;
+    option.textContent = `${spool.brand} - ${spool.color} (${spool.material}) (${spool.weight.toFixed(2)}g)`;
+    secondSpoolSelect.appendChild(option);
+  });
+  
+  // Update calculation display
+  document.getElementById("firstSpoolUsed").textContent = `${firstSpoolUsed.toFixed(2)}g`;
+  document.getElementById("secondSpoolUsed").textContent = `${spoolInfo.shortage.toFixed(2)}g (minimum)`;
+  document.getElementById("totalUsed").textContent = `${spoolInfo.gramsUsed.toFixed(2)}g`;
+  
+  // Add listener for second spool final weight
+  document.getElementById("secondSpoolFinalWeight").addEventListener("input", updateSecondSpoolCalculation);
+  document.getElementById("secondSpoolSelect").addEventListener("change", updateSecondSpoolCalculation);
+}
+
+// Update calculation when user enters second spool info
+function updateSecondSpoolCalculation() {
+  const modal = document.getElementById("multiSpoolModal");
+  const spoolInfo = JSON.parse(modal.dataset.spoolInfo);
+  const firstSpoolUsed = parseFloat(modal.dataset.firstSpoolUsed);
+  
+  const secondSpoolSelect = document.getElementById("secondSpoolSelect");
+  const selectedOption = secondSpoolSelect.options[secondSpoolSelect.selectedIndex];
+  
+  if (!selectedOption || !selectedOption.dataset.startWeight) return;
+  
+  const secondSpoolStart = parseFloat(selectedOption.dataset.startWeight);
+  const secondSpoolFinal = parseFloat(document.getElementById("secondSpoolFinalWeight").value);
+  
+  if (!isNaN(secondSpoolFinal)) {
+    const secondSpoolUsed = secondSpoolStart - secondSpoolFinal;
+    const total = firstSpoolUsed + secondSpoolUsed;
+    
+    document.getElementById("secondSpoolUsed").textContent = `${secondSpoolUsed.toFixed(2)}g`;
+    document.getElementById("totalUsed").textContent = `${total.toFixed(2)}g`;
+  }
+}
+
+// Complete multi-spool print job
+async function completeMultiSpoolPrint() {
+  const modal = document.getElementById("multiSpoolModal");
+  const spoolInfo = JSON.parse(modal.dataset.spoolInfo);
+  const firstSpoolEmpty = modal.dataset.firstSpoolEmpty === 'true';
+  const firstSpoolUsed = parseFloat(modal.dataset.firstSpoolUsed);
+  
+  const secondSpoolId = document.getElementById("secondSpoolSelect").value;
+  const secondSpoolFinal = parseFloat(document.getElementById("secondSpoolFinalWeight").value);
+  
+  if (!secondSpoolId) {
+    alert("Please select the second spool you used.");
+    return;
+  }
+  
+  if (isNaN(secondSpoolFinal)) {
+    alert("Please enter the final weight of the second spool.");
+    return;
+  }
+  
+  try {
+    const secondSpool = spoolLibrary[parseInt(secondSpoolId)];
+    const secondSpoolUsed = secondSpool.weight - secondSpoolFinal;
+    
+    if (secondSpoolFinal < 0) {
+      alert("Second spool final weight cannot be negative. Please check your measurement.");
+      return;
+    }
+    
+    // Update first spool
+    const firstSpoolIndex = parseInt(spoolInfo.spoolId);
+    const firstSpoolFinalWeight = firstSpoolEmpty ? 0 : (spoolInfo.startWeight - firstSpoolUsed);
+    
+    spoolLibrary[firstSpoolIndex].weight = firstSpoolFinalWeight;
+    
+    // Update second spool
+    spoolLibrary[parseInt(secondSpoolId)].weight = secondSpoolFinal;
+    
+    // Update both spools in Firebase
+    await updateSpoolWeightInFirebase(firstSpoolIndex, firstSpoolFinalWeight);
+    await updateSpoolWeightInFirebase(parseInt(secondSpoolId), secondSpoolFinal);
+    
+    // Create updated spools array for history
+    const updatedSpools = activePrintJob.spools.map(spoolData => {
+      if (spoolData.spoolId === spoolInfo.spoolId) {
+        return {
+          ...spoolData,
+          endWeight: firstSpoolFinalWeight,
+          gramsUsed: firstSpoolUsed,
+          used: firstSpoolUsed,
+          multiSpool: true,
+          ranOut: firstSpoolEmpty
+        };
+      }
+      return {
+        ...spoolData,
+        endWeight: spoolData.startWeight, // Other spools weren't used (if multi-selected originally)
+        gramsUsed: 0,
+        used: 0
+      };
+    });
+    
+    // Add second spool to history
+    updatedSpools.push({
+      spoolId: secondSpoolId,
+      spoolLabel: `${secondSpool.brand} - ${secondSpool.color} (${secondSpool.material})`,
+      startWeight: secondSpool.weight + secondSpoolUsed,
+      endWeight: secondSpoolFinal,
+      gramsUsed: secondSpoolUsed,
+      used: secondSpoolUsed,
+      multiSpool: true,
+      secondarySpool: true
+    });
+    
+    // Save history entry
+    const historyEntry = {
+      jobId: activePrintJob.jobId,
+      jobName: activePrintJob.jobName,
+      spools: updatedSpools,
+      startTime: activePrintJob.startTime,
+      endTime: new Date().toISOString(),
+      status: "success",
+      multiSpool: true
+    };
+    
+    // Add user tracking if in business workspace
+    if (currentWorkspace !== 'personal') {
+      historyEntry.userId = currentUser.uid;
+      historyEntry.location = activeOrganization.members.find(m => m.userId === currentUser.uid)?.location || 'Unknown';
+    }
+
+    let docRef;
+    
+    // Determine where to save based on workspace
+    if (currentWorkspace === 'personal') {
+      docRef = await db.collection('users').doc(currentUser.uid).collection('history').add(historyEntry);
+    } else {
+      docRef = await db.collection('organizations').doc(currentWorkspace).collection('history').add(historyEntry);
+    }
+    
+    // Add to local array
+    usageHistory.push({
+      firestoreId: docRef.id,
+      ...historyEntry
+    });
+
+    // Clear active job
+    localStorage.removeItem("activePrintJob");
+    activePrintJob = null;
+
+    console.log('✅ Multi-spool print job saved');
+    
+    // Close modal
+    modal.style.display = "none";
+    
+    alert("Multi-spool print job recorded successfully!");
+    showScreen("home");
+
+  } catch (error) {
+    console.error('Error completing multi-spool print:', error);
+    alert('Failed to save print job. Please try again.');
+  }
+}
+
+// Helper function to update spool weight in Firebase
+async function updateSpoolWeightInFirebase(spoolIndex, newWeight) {
+  if (spoolLibrary[spoolIndex] && spoolLibrary[spoolIndex].firestoreId) {
+    let spoolRef;
+    if (currentWorkspace === 'personal') {
+      spoolRef = db.collection('users').doc(currentUser.uid)
+        .collection('spools').doc(spoolLibrary[spoolIndex].firestoreId);
+    } else {
+      spoolRef = db.collection('organizations').doc(currentWorkspace)
+        .collection('spools').doc(spoolLibrary[spoolIndex].firestoreId);
+    }
+    
+    await spoolRef.update({ weight: newWeight });
+  }
+}
+
+// Close multi-spool modal
+function closeMultiSpoolModal() {
+  document.getElementById("multiSpoolModal").style.display = "none";
+}
+
 async function endPrintJob() {
   try {
+    // First pass: detect if any spool would go negative
+    const spoolsNeedingMore = [];
+    
+    activePrintJob.spools.forEach(spoolData => {
+      const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
+      let endWeight;
+      
+      if (endWeightInput && endWeightInput.trim() !== "") {
+        endWeight = parseFloat(endWeightInput);
+      } else if (spoolData.estimatedWeight) {
+        endWeight = spoolData.startWeight - spoolData.estimatedWeight;
+      } else {
+        return; // Will be caught by later validation
+      }
+      
+      if (!isNaN(endWeight) && endWeight < 0) {
+        const gramsUsed = spoolData.startWeight - endWeight;
+        spoolsNeedingMore.push({
+          spoolId: spoolData.spoolId,
+          spoolLabel: spoolData.spoolLabel,
+          startWeight: spoolData.startWeight,
+          attempted: Math.abs(endWeight),
+          gramsUsed: gramsUsed,
+          shortage: Math.abs(endWeight)
+        });
+      }
+    });
+    
+    // If any spools would go negative, show multi-spool dialog
+    if (spoolsNeedingMore.length > 0) {
+      await handleMultiSpoolPrint(spoolsNeedingMore);
+      return; // Exit and let user handle it
+    }
+    
+    // Original validation and processing continues...
     const updatedSpools = activePrintJob.spools.map(spoolData => {
       const endWeightInput = document.getElementById(`endWeight_${spoolData.spoolId}`).value;
       let endWeight;
@@ -1813,13 +2131,6 @@ function deleteEmptySpoolFromModal(index) {
 
 
 
-// Close modal when clicking outside of it
-window.addEventListener("click", (e) => {
-  const modal = document.getElementById("emptySpoolModal");
-  if (e.target === modal) {
-    closeEmptySpoolModal();
-  }
-});
 
 window.showScreen = showScreen;
 
@@ -2185,18 +2496,6 @@ async function joinOrganization() {
 
 // ===== END ORGANIZATION MANAGEMENT =====
 
-// Close modals when clicking outside
-window.addEventListener("click", (e) => {
-  const createOrgModal = document.getElementById("createOrgModal");
-  const joinOrgModal = document.getElementById("joinOrgModal");
-  
-  if (e.target === createOrgModal) {
-    closeCreateOrgModal();
-  }
-  if (e.target === joinOrgModal) {
-    closeJoinOrgModal();
-  }
-});
 
 // ===== BUSINESS MANAGEMENT IN SETTINGS =====
 
@@ -2302,10 +2601,7 @@ async function showBusinessManagementModal() {
   await renderMembersList();
 }
 
-// Close business management modal
-function closeBusinessManagementModal() {
-  document.getElementById("businessManagementModal").style.display = "none";
-}
+
 
 // Render members list
 async function renderMembersList() {
@@ -2414,22 +2710,7 @@ async function removeMemberConfirm(userId, email) {
   }
 }
 
-// Close modal when clicking outside
-window.addEventListener("click", (e) => {
-  const createOrgModal = document.getElementById("createOrgModal");
-  const joinOrgModal = document.getElementById("joinOrgModal");
-  const businessMgmtModal = document.getElementById("businessManagementModal");
-  
-  if (e.target === createOrgModal) {
-    closeCreateOrgModal();
-  }
-  if (e.target === joinOrgModal) {
-    closeJoinOrgModal();
-  }
-  if (e.target === businessMgmtModal) {
-    closeBusinessManagementModal();
-  }
-});
+
 
 // ===== END BUSINESS MANAGEMENT MODAL =====
 
@@ -2525,3 +2806,32 @@ async function transferUserDataToPersonal(userId, orgId) {
     throw error;
   }
 }
+
+
+// Close modals when clicking outside
+window.addEventListener("click", (e) => {
+  const createOrgModal = document.getElementById("createOrgModal");
+  const joinOrgModal = document.getElementById("joinOrgModal");
+  const modal = document.getElementById("emptySpoolModal");
+  const businessMgmtModal = document.getElementById("businessManagementModal");
+  const multiSpoolModal = document.getElementById("multiSpoolModal");
+  
+  if (e.target === createOrgModal) {
+    closeCreateOrgModal();
+  }
+  if (e.target === joinOrgModal) {
+    closeJoinOrgModal();
+  }
+
+
+  if (e.target === modal) {
+    closeEmptySpoolModal();
+  }
+
+  if (e.target === businessMgmtModal) {
+    closeBusinessManagementModal();
+  }
+  if (e.target === multiSpoolModal) { 
+    closeMultiSpoolModal();
+  }
+});
